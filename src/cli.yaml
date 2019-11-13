@@ -31,12 +31,12 @@ args:
   - metrics_step:
       long: metrics-step
       env: ERU_AGENT_METRICS_STEP
-      default_value: "0"
       help: interval for metrics to send
   - metrics_transfers:
       long: metrics-transfers
       env: ERU_AGENT_METRICS_TRANSFERS
-      help: etrics destinations
+      multiple: true
+      help: metrics destinations
   - api_addr:
       long: api-addr
       env: ERU_AGENT_API_ADDR
@@ -44,6 +44,7 @@ args:
   - log_forwards:
       long: log-forwards
       env: ERU_AGENT_LOG_FORWARDS
+      multiple: true
       help: log destinations
   - log_stdout:
       long: log-stdout
@@ -56,12 +57,10 @@ args:
   - health_check_interval:
       long: health-check-interval
       env: ERU_AGENT_HEALTH_CHECK_INTERVAL
-      default_value: "0"
       help: interval for agent to check container's health status
   - health_check_timeout:
       long: health-check-timeout
       env: ERU_AGENT_HEALTH_CHECK_TIMEOUT
-      default_value: "0"
       help: timeout for agent to check container's health status
   - hostname:
       long: hostname
