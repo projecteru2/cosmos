@@ -1,0 +1,69 @@
+name: eru-agent
+version: 19.10.31
+author: zc <greyschwinger@gmail.com>
+about: run eru agent
+args:
+  - config:
+      long: config
+      env: ERU_AGENT_CONFIG_PATH
+      default_value: /etc/eru/agent.yaml
+      help: config file path for agent, in yaml
+  - log_level:
+      long: log-level
+      env: ERU_AGENT_LOG_LEVEL
+      help: set log level
+  - core_endpoint:
+      long: core-endpoint
+      env: ERU_AGENT_CORE_ENDPOINT
+      help: core endpoint
+  - core_user:
+      long: core-user
+      env: ERU_AGENT_CORE_USERNAME
+      help: core username
+  - core_password:
+      long: core-password
+      env: ERU_AGENT_CORE_PASSWORD
+      help: core password
+  - docker_endpoint:
+      long: docker-endpoint
+      env: ERU_AGENT_DOCKER_ENDPOINT
+      help: docker endpoint
+  - metrics_step:
+      long: metrics-step
+      env: ERU_AGENT_METRICS_STEP
+      default_value: "0"
+      help: interval for metrics to send
+  - metrics_transfers:
+      long: metrics-transfers
+      env: ERU_AGENT_METRICS_TRANSFERS
+      help: etrics destinations
+  - api_addr:
+      long: api-addr
+      env: ERU_AGENT_API_ADDR
+      help: agent API serving address
+  - log_forwards:
+      long: log-forwards
+      env: ERU_AGENT_LOG_FORWARDS
+      help: log destinations
+  - log_stdout:
+      long: log-stdout
+      env: ERU_AGENT_LOG_STDOUT
+      help: forward stdout out? yes/no
+  - pidfile:
+      long: pidfile
+      env: ERU_AGENT_PIDFILE
+      help: pidfile to save
+  - health_check_interval:
+      long: health-check-interval
+      env: ERU_AGENT_HEALTH_CHECK_INTERVAL
+      default_value: "0"
+      help: interval for agent to check container's health status
+  - health_check_timeout:
+      long: health-check-timeout
+      env: ERU_AGENT_HEALTH_CHECK_TIMEOUT
+      default_value: "0"
+      help: timeout for agent to check container's health status
+  - hostname:
+      long: hostname
+      env: ERU_HOSTNAME
+      help: change hostname
