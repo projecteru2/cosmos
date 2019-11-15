@@ -1,39 +1,38 @@
-use clap::App;
-use clap::ArgMatches;
+use std::{fs, sync::Once};
+
+use clap::{load_yaml, App, ArgMatches};
 use hostname::get_hostname;
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::sync::Once;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
-    core: String,
+    pub core: String,
     #[serde(default = "empty_string")]
-    log_level: String,
+    pub log_level: String,
     #[serde(default = "empty_string")]
-    pidfile: String,
+    pub pidfile: String,
     #[serde(default)]
-    docker: DockerConfig,
+    pub docker: DockerConfig,
     #[serde(default)]
-    metrics: MetricsConfig,
+    pub metrics: MetricsConfig,
     #[serde(default)]
-    api: ApiConfig,
+    pub api: ApiConfig,
     #[serde(default)]
-    log: LogConfig,
+    pub log: LogConfig,
     #[serde(default = "zero_i32")]
-    health_check_interval: i32,
+    pub health_check_interval: i32,
     #[serde(default = "zero_i32")]
-    health_check_timeout: i32,
+    pub health_check_timeout: i32,
     #[serde(default = "empty_string")]
-    hostname: String,
+    pub hostname: String,
     #[serde(default)]
-    auth: AuthConfig,
+    pub auth: AuthConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct DockerConfig {
+pub struct DockerConfig {
     #[serde(default = "empty_string")]
-    endpoint: String,
+    pub endpoint: String,
 }
 
 impl Default for DockerConfig {
@@ -45,11 +44,11 @@ impl Default for DockerConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct MetricsConfig {
+pub struct MetricsConfig {
     #[serde(default = "zero_i32")]
-    step: i32,
+    pub step: i32,
     #[serde(default = "empty_vec_string")]
-    transfers: Vec<String>,
+    pub transfers: Vec<String>,
 }
 
 impl Default for MetricsConfig {
@@ -62,8 +61,8 @@ impl Default for MetricsConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct ApiConfig {
-    addr: String,
+pub struct ApiConfig {
+    pub addr: String,
 }
 
 impl Default for ApiConfig {
@@ -75,11 +74,11 @@ impl Default for ApiConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct LogConfig {
+pub struct LogConfig {
     #[serde(default = "empty_vec_string")]
-    forwards: Vec<String>,
+    pub forwards: Vec<String>,
     #[serde(default = "false_bool")]
-    stdout: bool,
+    pub stdout: bool,
 }
 
 impl Default for LogConfig {
@@ -92,11 +91,11 @@ impl Default for LogConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct AuthConfig {
+pub struct AuthConfig {
     #[serde(default = "empty_string")]
-    username: String,
+    pub username: String,
     #[serde(default = "empty_string")]
-    password: String,
+    pub password: String,
 }
 
 impl Default for AuthConfig {

@@ -1,12 +1,16 @@
-#[macro_use]
-extern crate clap;
-
 mod config;
+mod logging;
+
 use config::Config;
+
+use slog::{debug, error, info};
 
 fn main() {
     config::init();
-    let conf = Config::get();
+    logging::init();
 
-    println!("config: {:#?}", conf);
+    let log = logging::Log::get("main");
+    error!(log, "{:#?}", Config::get());
+    info!(log, "this is log");
+    debug!(log, "debug");
 }
