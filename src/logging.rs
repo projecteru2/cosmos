@@ -47,14 +47,17 @@ pub fn init() {
     Log::init(level);
 }
 
+#[allow(dead_code)]
 pub fn info(s: &str) {
     slog::info!(Log::get(), "{}", s);
 }
 
+#[allow(dead_code)]
 pub fn debug(s: &str) {
     slog::debug!(Log::get(), "{}", s);
 }
 
+#[allow(dead_code)]
 pub fn error(s: &str) {
     slog::error!(Log::get(), "{}", s);
 }

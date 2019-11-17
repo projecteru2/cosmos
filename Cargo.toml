@@ -14,5 +14,5 @@ hostname = "0.1.5"
 slog = { version = "2.5.2", features = ["max_level_trace", "release_max_level_warn"] }
 slog-term = "2.4.2"
 tokio = "=0.2.0-alpha.5"
-reqwest = "0.9"
 futures-preview = { version = "=0.3.0-alpha.18", features = ["async-await", "nightly"] }
+hyper = "=0.13.0-alpha.2"

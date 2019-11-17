@@ -1,13 +1,12 @@
-use std::rc::Rc;
-
 use super::CosmosApp;
 
+pub struct Cleg<T: CosmosApp + 'static> {
+    pub app: &'static T,
+}
 
-pub struct Cleg {}
-
-impl Cleg {
-    pub fn new(_app: Rc<impl CosmosApp>) -> Self {
-        Cleg {}
+impl<T: CosmosApp> Cleg<T> {
+    pub fn new(app: &'static T) -> Self {
+        Cleg { app }
     }
 
     pub fn start(&self) {}

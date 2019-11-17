@@ -2,26 +2,22 @@ mod app;
 mod cleg;
 mod server;
 
-use std::rc::Rc;
+//use std::sync::{Arc, Mutex};
 
-use app::App;
-use cleg::Cleg;
-use server::Server;
+pub use app::App;
+pub use cleg::Cleg;
+pub use server::HTTPServer;
 
-pub struct Agent {
-    cleg: Cleg,
-    server: Server,
+pub struct Agent<T: CosmosApp + 'static> {
+    cleg: Cleg<T>,
+    server: HTTPServer<T>,
 }
 
-impl Agent {
-    pub fn new() -> Self {
-        let app = Rc::new(App::new());
-        let cleg = Cleg::new(Rc::clone(&app));
-        let server = Server::new(Rc::clone(&app));
-        Agent {
-            cleg: cleg,
-            server: server,
-        }
+impl<T: CosmosApp + 'static> Agent<T> {
+    pub fn new(app: &'static T) -> Self {
+        let cleg = Cleg::new(app);
+        let server = HTTPServer::new(app);
+        Agent { cleg, server }
     }
 
     pub fn start(&mut self) {
@@ -39,6 +35,6 @@ impl Agent {
     fn install_signal_handlers(&self) {}
 }
 
-pub trait CosmosApp {
+pub trait CosmosApp: Sync {
     fn version(&self) -> String;
 }
