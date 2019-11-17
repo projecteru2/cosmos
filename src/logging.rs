@@ -1,52 +1,60 @@
-use slog::*;
+use slog;
+use slog::Drain;
 use slog_term::PlainSyncDecorator;
 
 use crate::config::Config;
 
 static mut LOG: Option<Log> = None;
 
-pub struct Log {
-    root: Logger,
+struct Log {
+    root: slog::Logger,
 }
 
 impl Log {
-    fn init(level: Level) {
+    fn init(level: slog::Level) {
         let plain = PlainSyncDecorator::new(std::io::stdout());
         let drain = slog_term::FullFormat::new(plain)
             .build()
             .filter_level(level)
             .fuse();
-        let root = Logger::root(drain, o!());
+        let root = slog::Logger::root(drain, slog::o!("app" => "cosmos"));
         unsafe {
             LOG = Some(Log::new(root));
         }
     }
 
-    fn new(root: Logger) -> Self {
+    fn new(root: slog::Logger) -> Self {
         Log { root: root }
     }
 
-    pub fn get(module: &'static str) -> Logger {
-        unsafe {
-            LOG.as_ref()
-                .expect("log not init")
-                .root
-                .new(o!("module" => module))
-        }
+    fn get() -> slog::Logger {
+        unsafe { LOG.as_ref().expect("log not init").root.new(slog::o!()) }
     }
 }
 
 pub fn init() {
     let conf = Config::get();
     let level = match conf.log_level.to_lowercase().as_str() {
-        "panic" | "fatal" => Level::Critical,
-        "error" => Level::Error,
-        "warn" | "warning" => Level::Warning,
-        "info" => Level::Info,
-        "debug" => Level::Debug,
-        "trace" => Level::Trace,
+        "panic" | "fatal" => slog::Level::Critical,
+        "error" => slog::Level::Error,
+        "warn" | "warning" => slog::Level::Warning,
+        "info" => slog::Level::Info,
+        "debug" => slog::Level::Debug,
+        "trace" => slog::Level::Trace,
         _ => panic!("invalid log level"),
     };
 
     Log::init(level);
+}
+
+pub fn info(s: &str) {
+    slog::info!(Log::get(), "{}", s);
+}
+
+pub fn debug(s: &str) {
+    slog::debug!(Log::get(), "{}", s);
+}
+
+pub fn error(s: &str) {
+    slog::error!(Log::get(), "{}", s);
 }

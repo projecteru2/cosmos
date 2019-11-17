@@ -1,16 +1,14 @@
+mod agent;
 mod config;
 mod logging;
-
-use config::Config;
-
-use slog::{debug, error, info};
 
 fn main() {
     config::init();
     logging::init();
+    logging::debug(&format!("{:#?}", config::Config::get()));
 
-    let log = logging::Log::get("main");
-    error!(log, "{:#?}", Config::get());
-    info!(log, "this is log");
-    debug!(log, "debug");
+    let ag = agent::Agent::new();
+    ag.start();
+    ag.wait();
+    logging::info("exited");
 }
