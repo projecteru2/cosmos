@@ -1,32 +1,8 @@
-use super::CosmosApp;
-pub struct App {}
+mod docker_app;
 
-static mut APP: Option<App> = None;
+pub use super::CosmosApp;
+pub use docker_app::ContainerApp;
 
-impl App {
-    pub fn get() -> &'static Self {
-        unsafe {
-            match APP.as_ref() {
-                None => Self::init(),
-                _ => (),
-            };
-            APP.as_ref().unwrap()
-        }
-    }
-
-    fn init() {
-        unsafe {
-            APP = Some(Self::new());
-        }
-    }
-
-    fn new() -> Self {
-        App {}
-    }
-}
-
-impl CosmosApp for App {
-    fn version(&self) -> String {
-        "2019-11-04".to_string()
-    }
+pub fn get_container_app() -> &'static ContainerApp {
+    ContainerApp::get()
 }

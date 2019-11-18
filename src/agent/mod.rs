@@ -1,12 +1,11 @@
-mod app;
+pub mod app;
 mod cleg;
 mod server;
 
-//use std::sync::{Arc, Mutex};
+use futures::Stream;
 
-pub use app::App;
-pub use cleg::Cleg;
-pub use server::HTTPServer;
+use cleg::Cleg;
+use server::HTTPServer;
 
 pub struct Agent<T: CosmosApp + 'static> {
     cleg: Cleg<T>,
@@ -36,5 +35,16 @@ impl<T: CosmosApp + 'static> Agent<T> {
 }
 
 pub trait CosmosApp: Sync {
-    fn version(&self) -> String;
+    type Event: std::fmt::Debug;
+    type Error: std::fmt::Debug;
+
+    fn version(&self) -> String {
+        "2019-11-04".to_string()
+    }
+
+    fn handle_start_event(&self, event: Self::Event);
+
+    fn handle_die_event(&self, event: Self::Event);
+
+    fn watch(&self) -> Box<dyn Stream<Item = Result<Self::Event, Self::Error>> + Unpin + Send>;
 }
