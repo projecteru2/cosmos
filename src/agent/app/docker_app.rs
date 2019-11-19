@@ -1,12 +1,16 @@
-use futures::stream::{self, Stream};
+use futures::Stream;
 
+use shiplift::builder::{EventFilter, EventFilterType, EventsOptions};
 use shiplift::errors::Error as DockerError;
 use shiplift::rep::Event as DockerEvent;
+use shiplift::Docker;
 
 use super::CosmosApp;
 use crate::logging;
 
-pub struct ContainerApp {}
+pub struct ContainerApp {
+    docker: Docker,
+}
 
 static mut CONTAINER_APP: Option<ContainerApp> = None;
 
@@ -28,7 +32,9 @@ impl ContainerApp {
     }
 
     fn new() -> Self {
-        Self {}
+        Self {
+            docker: Docker::new(),
+        }
     }
 }
 
@@ -44,21 +50,9 @@ impl CosmosApp for ContainerApp {
         logging::debug(&format!("handling die event: {:#?}", event));
     }
 
-    fn watch(&self) -> Box<dyn Stream<Item = Result<Self::Event, Self::Error>> + Unpin + Send> {
-        use std::collections::HashMap;
-        let values = vec![Ok(DockerEvent {
-            typ: "container".to_string(),
-            action: "die".to_string(),
-            actor: shiplift::rep::Actor {
-                id: "".to_string(),
-                attributes: HashMap::new(),
-            },
-            status: None,
-            id: None,
-            from: None,
-            time: 0,
-            time_nano: 0,
-        })];
-        Box::new(stream::iter(values))
+    fn watch(&self) -> Box<dyn Stream<Item = Self::Event, Error = Self::Error> + Send> {
+        let event_filters = vec![EventFilter::Type(EventFilterType::Container)];
+        let opts = EventsOptions::builder().filter(event_filters).build();
+        Box::new(self.docker.events(&opts))
     }
 }

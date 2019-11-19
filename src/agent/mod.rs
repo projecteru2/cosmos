@@ -25,18 +25,12 @@ impl<T: CosmosApp + 'static> Agent<T> {
         self.server.start();
     }
 
-    pub async fn wait(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.server.wait().await?;
-        self.cleg.wait().await?;
-        Ok(())
-    }
-
     fn install_signal_handlers(&self) {}
 }
 
 pub trait CosmosApp: Sync {
     type Event: std::fmt::Debug;
-    type Error: std::fmt::Debug;
+    type Error: std::fmt::Debug + Send;
 
     fn version(&self) -> String {
         "2019-11-04".to_string()
@@ -46,5 +40,5 @@ pub trait CosmosApp: Sync {
 
     fn handle_die_event(&self, event: Self::Event);
 
-    fn watch(&self) -> Box<dyn Stream<Item = Result<Self::Event, Self::Error>> + Unpin + Send>;
+    fn watch(&self) -> Box<dyn Stream<Item = Self::Event, Error = Self::Error> + Send>;
 }
