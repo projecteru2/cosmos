@@ -29,6 +29,7 @@ impl<T: CosmosApp + 'static> Agent<T> {
 }
 
 pub trait CosmosApp: Sync {
+    type Sandbox;
     type Event: std::fmt::Debug;
     type Error: std::fmt::Debug + Send;
 
@@ -36,9 +37,9 @@ pub trait CosmosApp: Sync {
         "2019-11-04".to_string()
     }
 
-    fn handle_start_event(&self, event: Self::Event);
-
-    fn handle_die_event(&self, event: Self::Event);
+    fn handle_events(&self, event: Self::Event);
 
     fn watch(&self) -> Box<dyn Stream<Item = Self::Event, Error = Self::Error> + Send>;
+
+    fn get_sandbox(&self, id: String) -> Self::Sandbox;
 }

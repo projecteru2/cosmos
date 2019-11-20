@@ -1,4 +1,5 @@
 use futures::Stream;
+use std::sync::Arc;
 
 use shiplift::builder::{EventFilter, EventFilterType, EventsOptions};
 use shiplift::errors::Error as DockerError;
@@ -7,9 +8,11 @@ use shiplift::Docker;
 
 use super::CosmosApp;
 use crate::logging;
+use crate::model::Container;
+use crate::model::Sandbox;
 
 pub struct ContainerApp {
-    docker: Docker,
+    docker: Arc<Docker>,
 }
 
 static mut CONTAINER_APP: Option<ContainerApp> = None;
@@ -33,26 +36,57 @@ impl ContainerApp {
 
     fn new() -> Self {
         Self {
-            docker: Docker::new(),
+            docker: Arc::new(Docker::new()),
         }
     }
 }
 
 impl CosmosApp for ContainerApp {
+    type Sandbox = Container;
     type Event = DockerEvent;
     type Error = DockerError;
 
-    fn handle_start_event(&self, event: Self::Event) {
-        logging::debug(&format!("handling start event: {:#?}", event));
-    }
+    fn handle_events(&self, event: Self::Event) {
+        logging::debug(&format!("event -> {:#?}", event));
+        match event {
+            DockerEvent {
+                typ: _,
+                action,
+                actor: _,
+                status: _,
+                id: Some(id),
+                from: _,
+                time: _,
+                time_nano: _,
+            } => {
+                logging::info(&format!("{} event for container {}", action, id));
+                let container = self.get_sandbox(id);
+                match action.as_str() {
+                    "start" => {
+                        container.started();
+                    }
 
-    fn handle_die_event(&self, event: Self::Event) {
-        logging::debug(&format!("handling die event: {:#?}", event));
+                    "die" => {
+                        container.died();
+                    }
+                    _ => {
+                        logging::info(&format!("ignore event: {}", action));
+                    }
+                }
+            }
+            _ => {
+                logging::info(&format!("other events: {:#?}", event));
+            }
+        }
     }
 
     fn watch(&self) -> Box<dyn Stream<Item = Self::Event, Error = Self::Error> + Send> {
         let event_filters = vec![EventFilter::Type(EventFilterType::Container)];
         let opts = EventsOptions::builder().filter(event_filters).build();
         Box::new(self.docker.events(&opts))
+    }
+
+    fn get_sandbox(&self, id: String) -> Self::Sandbox {
+        Container::new(id, self.docker.clone())
     }
 }

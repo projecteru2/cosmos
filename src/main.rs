@@ -1,6 +1,9 @@
 mod agent;
 mod config;
+mod libs;
 mod logging;
+mod model;
+mod orchestrator;
 
 use futures::future::lazy;
 

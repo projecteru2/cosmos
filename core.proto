@@ -1,0 +1,492 @@
+syntax = "proto3";
+
+package pb;
+
+service CoreRPC {
+    rpc ListPods(Empty) returns (Pods) {};
+    rpc AddPod(AddPodOptions) returns (Pod) {};
+    rpc RemovePod(RemovePodOptions) returns (Empty) {};
+    rpc GetPod(GetPodOptions) returns (Pod) {};
+    rpc GetPodResource(GetPodOptions) returns (PodResource) {};
+
+    rpc AddNode(AddNodeOptions) returns (Node) {};
+    rpc RemoveNode(RemoveNodeOptions) returns (Empty) {};
+    rpc SetNode(SetNodeOptions) returns (Node) {};
+    rpc GetNode(GetNodeOptions) returns (Node) {};
+    rpc GetNodeResource(GetNodeOptions) returns (NodeResource) {};
+    rpc GetContainer(ContainerID) returns (Container) {};
+    rpc GetContainers(ContainerIDs) returns (Containers) {};
+    rpc GetNodeByName(GetNodeOptions) returns (Node) {};
+    rpc ListPodNodes(ListNodesOptions) returns (Nodes) {};
+    rpc ListNetworks(ListNetworkOptions) returns (Networks) {};
+    rpc ListNodeContainers(GetNodeOptions) returns (Containers) {};
+    rpc ListContainers(ListContainersOptions) returns (stream Container) {};
+
+    rpc ContainerDeployed(ContainerDeployedOptions) returns (Empty) {};
+
+    rpc Copy(CopyOptions) returns (stream CopyMessage) {};
+    rpc Send(SendOptions) returns (stream SendMessage) {};
+    rpc BuildImage(BuildImageOptions) returns (stream BuildImageMessage) {};
+    rpc CacheImage(CacheImageOptions) returns (stream CacheImageMessage) {};
+    rpc RemoveImage(RemoveImageOptions) returns (stream RemoveImageMessage) {};
+    rpc DeployStatus(DeployStatusOptions) returns (stream DeployStatusMessage) {};
+    rpc RunAndWait(stream RunAndWaitOptions) returns (stream AttachContainerMessage) {};
+    rpc CreateContainer(DeployOptions) returns (stream CreateContainerMessage) {};
+    rpc ReplaceContainer(ReplaceOptions) returns (stream ReplaceContainerMessage) {};
+    rpc RemoveContainer(RemoveContainerOptions) returns (stream RemoveContainerMessage) {};
+    rpc DissociateContainer(DissociateContainerOptions) returns (stream DissociateContainerMessage) {};
+    rpc ControlContainer(ControlContainerOptions) returns (stream ControlContainerMessage) {};
+    rpc ExecuteContainer(stream ExecuteContainerOptions) returns (stream AttachContainerMessage) {};
+    rpc ReallocResource(ReallocOptions) returns (stream ReallocResourceMessage) {};
+    rpc LogStream(ContainerID) returns (stream LogStreamMessage) {};
+}
+
+message Empty {}
+
+message ListContainersOptions {
+    string appname = 1;
+    string entrypoint = 2;
+    string nodename = 3;
+    map<string, string> labels = 4;
+    int64 limit = 5;
+}
+
+message DeployStatusOptions {
+    string appname = 1;
+    string entrypoint = 2;
+    string nodename = 3;
+}
+
+message DeployStatusMessage {
+    string action = 1;
+    string appname = 2;
+    string entrypoint = 3;
+    string nodename = 4;
+    string id = 5;
+    bytes data = 6;
+}
+
+// 对的, protobuf 就是这样...
+message Pod {
+    string name = 1;
+    string desc = 2;
+}
+
+message Pods {
+    repeated Pod pods = 1;
+}
+
+message PodResource {
+    string name = 1;
+    map<string,double> cpu_percents = 2;
+    map<string,double> memory_percents = 3;
+    map<string, bool> verifications = 4;
+    map<string, string> details = 5;
+    map<string, double> storage_percents = 6;
+}
+
+message NodeResource {
+    string name = 1;
+    double cpu_percent = 2;
+    double memory_percent = 3;
+    bool verification = 4;
+    repeated string details = 5;
+    double storage_percent = 6;
+}
+
+message ListNetworkOptions {
+    string podname = 1;
+    string driver = 2;
+}
+
+message Network {
+    string name = 1;
+    repeated string subnets = 2;
+}
+
+message Networks {
+    repeated Network networks = 1;
+}
+
+message Node {
+    string name = 1;
+    string endpoint = 2;
+    string podname = 3;
+    map<string, int32> cpu = 4;
+    double cpu_used= 5;
+    int64 memory = 6;
+    int64 memory_used = 7;
+    bool available = 8;
+    map<string, string> labels = 9;
+    int64 init_memory = 10;
+    map<string, int32> init_cpu = 11;
+    string info = 12;
+    map<string, string> numa = 13;
+    map<string, int64> numa_memory = 14;
+    int64 storage = 15;
+    int64 storage_used = 16;
+    int64 init_storage = 17;
+}
+
+message Nodes {
+    repeated Node nodes = 1;
+}
+
+message NodeAvailable {
+    string nodename = 1;
+    string podname = 2;
+}
+
+message SetNodeOptions {
+    string nodename = 1;
+    string podname = 2;
+    int32 status = 3;
+    map<string, int32> delta_cpu = 4;
+    int64 delta_memory = 5;
+    int64 delta_storage = 6;
+    map<string, int64> delta_numa_memory = 7;
+    map<string, string> numa = 8;
+    map<string, string> labels = 9;
+}
+
+message Container {
+    string id = 1;
+    string podname = 2;
+    string nodename = 3;
+    string name = 4;
+    map<string, int32> cpu = 5;
+    double quota = 6;
+    int64 memory = 7;
+    bool privileged = 8;
+    map<string, string> labels = 9;
+    map<string, string> publish = 10;
+    string image = 11;
+    int64 storage = 12;
+    bytes status_data = 13;
+}
+
+message ContainerDeployedOptions {
+    string id = 1;
+    string appname = 2;
+    string entrypoint = 3;
+    string nodename = 4;
+    bytes data = 5;
+}
+
+message Containers {
+    repeated Container containers = 1;
+}
+
+message ContainerID {
+    string id = 1;
+}
+
+message ContainerIDs {
+    repeated string ids = 1;
+}
+
+message RemoveContainerOptions {
+    repeated string ids = 1;
+    bool force = 2;
+    int32 step = 3;
+}
+
+message DissociateContainerOptions {
+    repeated string ids = 1;
+}
+
+message ReallocOptions {
+    repeated string ids = 1;
+    double cpu = 2;
+    int64 memory = 3;
+}
+
+message AddPodOptions {
+    string name = 1;
+    string desc = 2;
+}
+
+message RemovePodOptions {
+    string name = 1;
+}
+
+message GetPodOptions {
+    string name = 1;
+}
+
+message AddNodeOptions {
+    string nodename = 1;
+    string endpoint = 2;
+    string podname = 3;
+    string ca = 4;
+    string cert = 5;
+    string key = 6;
+    int32 cpu = 7;
+    int32 share = 8;
+    int64 memory = 9;
+    map<string, string> labels = 10;
+    map<string, string> numa = 11;
+    map<string, int64> numa_memory = 12;
+    int64 storage = 13;
+}
+
+message RemoveNodeOptions {
+    string nodename = 1;
+    string podname = 2;
+}
+
+message GetNodeOptions {
+    string podname = 1;
+    string nodename = 2;
+}
+
+message ListNodesOptions {
+    string podname = 1;
+    bool all = 2;
+}
+
+message Build {
+    string base = 1;
+    string repo = 2;
+    string version = 3;
+    string dir = 4;
+    bool submodule = 5;
+    repeated string commands = 6;
+    map<string, string> envs = 7;
+    map<string, string> args = 8;
+    map<string, string> labels = 9;
+    map<string, string> artifacts = 10;
+    map<string, string> cache = 11;
+    string stop_signal = 12;
+}
+
+message Builds {
+    repeated string stages = 1;
+    map<string, Build> builds = 2;
+}
+
+message BuildImageOptions {
+    string name = 1;
+    string user = 2;
+    int32 uid = 3;
+    repeated string tags = 4;
+    Builds builds = 5;
+    bytes tar = 6;
+}
+
+message HookOptions {
+    repeated string after_start = 1;
+    repeated string before_stop = 2;
+    bool force = 3;
+}
+
+message HealthCheckOptions {
+    repeated string tcp_ports = 1;
+    string http_port = 2;
+    string url = 3;
+    int32 code = 4;
+}
+
+message LogOptions {
+    string type = 1;
+    map<string, string> config = 2;
+}
+
+message EntrypointOptions {
+    string name = 1;
+    string command = 2;
+    bool privileged = 3;
+    string dir = 4;
+    LogOptions log = 5;
+    repeated string publish = 6;
+    HealthCheckOptions healthcheck = 7;
+    HookOptions hook = 8;
+    string restart_policy = 9;
+    map<string, string> sysctls = 10;
+}
+
+message DeployOptions {
+    string name = 1;
+    EntrypointOptions entrypoint = 2;
+    string podname = 3;
+    string nodename = 4;
+    string image = 5;
+    string extra_args = 6;
+    double cpu_quota = 7;
+    int64 memory = 8;
+    int32 count = 9;
+    repeated string env = 10;
+    repeated string dns = 11;
+    repeated string extra_hosts = 12;
+    repeated string volumes = 13;
+    map<string, string> networks = 14;
+    string networkmode = 15;
+    string user = 16;
+    bool debug = 17;
+    bool openStdin = 18;
+    map<string, string> labels = 19;
+    map<string, string> nodelabels = 20;
+    string deploy_method = 21;
+    map<string, bytes> data = 22;
+    bool soft_limit = 23;
+    int32 nodes_limit = 24;
+    bool cpu_bind = 25;
+    bool ignore_hook = 26;
+    repeated string after_create = 27;
+    bytes raw_args = 28;
+    int64 storage = 29;
+}
+
+message ReplaceOptions {
+    DeployOptions deployOpt = 1;
+    bool networkinherit = 2;
+    map<string, string> filter_labels = 3;
+    map<string, string> copy = 4;
+    repeated string ids = 5;
+}
+
+message CacheImageOptions {
+    string podname = 1;
+    string nodename = 2;
+    repeated string images = 3;
+    int32 step = 4;
+}
+
+message RemoveImageOptions {
+    string podname = 1;
+    string nodename = 2;
+    repeated string images = 3;
+    int32 step = 4;
+    bool prune = 5;
+}
+
+message CopyPaths {
+    repeated string paths = 1;
+}
+
+message CopyOptions {
+    map<string, CopyPaths> targets = 1;
+}
+
+message SendOptions {
+    repeated string ids = 1;
+    map<string, bytes> data = 2;
+}
+
+message ErrorDetail {
+    int64 code = 1;
+    string message = 2;
+}
+
+message BuildImageMessage {
+    string id = 1;
+    string status = 2;
+    string progress = 3;
+    string error = 4;
+    string stream = 5;
+    ErrorDetail error_detail = 6;
+}
+
+message CreateContainerMessage {
+    string podname = 1;
+    string nodename = 2;
+    string id = 3;
+    string name = 4;
+    string error = 5;
+    bool success = 6;
+    map<string, int32> cpu = 7;
+    double quota = 8;
+    int64 memory = 9;
+    map<string, string> publish = 10;
+    bytes hook = 11;
+    int64 storage = 12;
+}
+
+message ReplaceContainerMessage {
+    CreateContainerMessage create = 1;
+    RemoveContainerMessage remove = 2;
+    string error = 3;
+}
+
+message CacheImageMessage {
+    string image = 1;
+    bool success = 2;
+    string nodename = 3;
+    string message = 4;
+}
+
+message RemoveImageMessage {
+    string image = 1;
+    bool success = 2;
+    repeated string messages = 3;
+}
+
+message RemoveContainerMessage {
+    string id = 1;
+    bool success = 2;
+    string hook = 3;
+}
+
+message DissociateContainerMessage {
+    string id = 1;
+    string error = 2;
+}
+
+message ReallocResourceMessage {
+    string id = 1;
+    bool success = 2;
+}
+
+message CopyMessage {
+    string id = 1;
+    string status = 2;
+    string name = 3;
+    string path = 4;
+    string error = 5;
+    bytes data = 6;
+}
+
+message SendMessage {
+    string id = 1;
+    string path = 2;
+    string error = 3;
+}
+
+message AttachContainerMessage {
+    string container_id = 1;
+    bytes data = 2;
+}
+
+message RunAndWaitOptions{
+    DeployOptions deploy_options = 1;
+    bytes cmd = 2;
+    bool async = 3;
+    int32 async_timeout = 4;
+}
+
+message ControlContainerOptions {
+    repeated string ids = 1;
+    string type = 2;
+    bool force = 3;
+}
+
+message ControlContainerMessage {
+    string id = 1;
+    string error = 2;
+    bytes hook = 3;
+}
+
+message LogStreamMessage {
+    string id = 1;
+    string error = 2;
+    bytes data = 3;
+}
+
+message ExecuteContainerOptions {
+    string container_id = 1;
+    repeated string commands = 2;
+    repeated string envs = 3;
+    string workdir = 4;
+    bool open_stdin = 5;
+    bytes repl_cmd = 6;
+}

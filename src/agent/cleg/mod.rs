@@ -17,10 +17,11 @@ impl<T: CosmosApp> Cleg<T> {
 
     pub fn start(&mut self) {
         let app = Arc::new(self.app);
-        let watcher = app
+        let watcher = self
+            .app
             .watch()
-            .for_each(|e| {
-                logging::info(&format!("event -> {:#?}", e));
+            .for_each(move |e| {
+                app.clone().handle_events(e);
                 Ok(())
             })
             .map_err(|e| {
