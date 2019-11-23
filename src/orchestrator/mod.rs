@@ -12,5 +12,5 @@ pub trait Orchestrator {
 }
 
 pub fn get_orchestrator() -> Box<dyn Orchestrator> {
-    Box::new(Eru {})
+    Box::new(Eru::new())
 }

@@ -17103,7 +17103,7 @@ pub struct RunAndWaitOptions {
     // message fields
     pub deploy_options: ::protobuf::SingularPtrField<DeployOptions>,
     pub cmd: ::std::vec::Vec<u8>,
-    pub async: bool,
+    pub r#async: bool,
     pub async_timeout: i32,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
@@ -17184,15 +17184,15 @@ impl RunAndWaitOptions {
 
 
     pub fn get_async(&self) -> bool {
-        self.async
+        self.r#async
     }
     pub fn clear_async(&mut self) {
-        self.async = false;
+        self.r#async = false;
     }
 
     // Param is passed by value, moved
     pub fn set_async(&mut self, v: bool) {
-        self.async = v;
+        self.r#async = v;
     }
 
     // int32 async_timeout = 4;
@@ -17236,7 +17236,7 @@ impl ::protobuf::Message for RunAndWaitOptions {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
                     let tmp = is.read_bool()?;
-                    self.async = tmp;
+                    self.r#async = tmp;
                 },
                 4 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
@@ -17264,7 +17264,7 @@ impl ::protobuf::Message for RunAndWaitOptions {
         if !self.cmd.is_empty() {
             my_size += ::protobuf::rt::bytes_size(2, &self.cmd);
         }
-        if self.async != false {
+        if self.r#async != false {
             my_size += 2;
         }
         if self.async_timeout != 0 {
@@ -17284,8 +17284,8 @@ impl ::protobuf::Message for RunAndWaitOptions {
         if !self.cmd.is_empty() {
             os.write_bytes(2, &self.cmd)?;
         }
-        if self.async != false {
-            os.write_bool(3, self.async)?;
+        if self.r#async != false {
+            os.write_bool(3, self.r#async)?;
         }
         if self.async_timeout != 0 {
             os.write_int32(4, self.async_timeout)?;
@@ -17344,8 +17344,8 @@ impl ::protobuf::Message for RunAndWaitOptions {
                 ));
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
                     "async",
-                    |m: &RunAndWaitOptions| { &m.async },
-                    |m: &mut RunAndWaitOptions| { &mut m.async },
+                    |m: &RunAndWaitOptions| { &m.r#async },
+                    |m: &mut RunAndWaitOptions| { &mut m.r#async },
                 ));
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
                     "async_timeout",
@@ -17376,7 +17376,7 @@ impl ::protobuf::Clear for RunAndWaitOptions {
     fn clear(&mut self) {
         self.deploy_options.clear();
         self.cmd.clear();
-        self.async = false;
+        self.r#async = false;
         self.async_timeout = 0;
         self.unknown_fields.clear();
     }

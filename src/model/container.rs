@@ -119,7 +119,7 @@ impl Container {
         self.check_health()
     }
 
-    fn check_check(&mut self) {
+    fn check_health(&mut self) {
         self.meta.healthy = false;
     }
 }
