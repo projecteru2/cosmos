@@ -10,6 +10,7 @@ edition = "2018"
 clap = { version = "~2.31.2", features = ["yaml"] }
 serde = { version = "~1.0", features = ["derive"] }
 serde_yaml = "~0.8"
+serde_json = "~1.0"
 hostname = "~0.1.5"
 slog = { version = "~2.5.2", features = ["max_level_trace", "release_max_level_warn"] }
 slog-term = "~2.4.2"

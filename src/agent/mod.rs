@@ -41,5 +41,5 @@ pub trait CosmosApp: Sync {
 
     fn watch(&self) -> Box<dyn Stream<Item = Self::Event, Error = Self::Error> + Send>;
 
-    fn get_sandbox(&self, id: String) -> Self::Sandbox;
+    fn get_sandbox(&self, id: String) -> Option<Self::Sandbox>;
 }

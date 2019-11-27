@@ -5,6 +5,7 @@ static mut CACHE: Option<HealthCache> = None;
 
 type Healthy = bool;
 
+#[derive(Default)]
 pub struct HealthCache {
     cache: Mutex<HashMap<String, Healthy>>,
 }

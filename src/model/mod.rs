@@ -1,7 +1,7 @@
 mod container;
 mod node;
 
-pub use container::Container;
+pub use container::EruContainer;
 pub use node::Node;
 
 pub trait Sandbox {

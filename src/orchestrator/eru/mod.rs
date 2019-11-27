@@ -5,7 +5,7 @@ use grpc::ClientStubExt;
 
 use super::Orchestrator;
 use crate::config::Config;
-use crate::model::Container;
+use crate::model::EruContainer;
 use crate::model::Node;
 use core_grpc::{CoreRPC, CoreRPCClient};
 
@@ -14,6 +14,8 @@ pub struct Eru {
 }
 
 impl Orchestrator for Eru {
+    type Sandbox = EruContainer;
+
     fn get_node(&self, name: &String) -> Node {
         let req = core::GetNodeOptions {
             nodename: name.to_string(),
@@ -29,7 +31,7 @@ impl Orchestrator for Eru {
 
     fn update_node(&self) {}
 
-    fn deploy_container_stats(&self, container: Container) {}
+    fn deploy_container_stats(&self, container: Self::Sandbox) {}
 }
 
 impl Eru {

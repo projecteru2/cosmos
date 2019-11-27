@@ -8,7 +8,7 @@ use shiplift::Docker;
 
 use super::CosmosApp;
 use crate::logging;
-use crate::model::Container;
+use crate::model::EruContainer;
 use crate::model::Sandbox;
 
 pub struct ContainerApp {
@@ -42,7 +42,7 @@ impl ContainerApp {
 }
 
 impl CosmosApp for ContainerApp {
-    type Sandbox = Container;
+    type Sandbox = EruContainer;
     type Event = DockerEvent;
     type Error = DockerError;
 
@@ -50,32 +50,30 @@ impl CosmosApp for ContainerApp {
         logging::debug(&format!("event -> {:#?}", event));
         match event {
             DockerEvent {
-                typ: _,
                 action,
-                actor: _,
-                status: _,
                 id: Some(id),
-                from: _,
-                time: _,
-                time_nano: _,
+                ..
             } => {
                 logging::info(&format!("{} event for container {}", action, id));
-                let container = self.get_sandbox(id);
-                match action.as_str() {
-                    "start" => {
-                        container.started();
-                    }
+                if let Some(container) = self.get_sandbox(id) {
+                    match action.as_str() {
+                        "start" => {
+                            container.started();
+                        }
 
-                    "die" => {
-                        container.died();
+                        "die" => {
+                            container.died();
+                        }
+                        _ => {
+                            logging::info(&format!("ignore container event: {}", action));
+                        }
                     }
-                    _ => {
-                        logging::info(&format!("ignore event: {}", action));
-                    }
-                }
+                } else {
+                    logging::info(&format!("invalid eru container"));
+                };
             }
             _ => {
-                logging::info(&format!("other events: {:#?}", event));
+                logging::info(&format!("other type of event: {:#?}", event));
             }
         }
     }
@@ -86,7 +84,7 @@ impl CosmosApp for ContainerApp {
         Box::new(self.docker.events(&opts))
     }
 
-    fn get_sandbox(&self, id: String) -> Self::Sandbox {
-        Container::new(id, self.docker.clone())
+    fn get_sandbox(&self, id: String) -> Option<Self::Sandbox> {
+        EruContainer::new(id, self.docker.clone())
     }
 }
