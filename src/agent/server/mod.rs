@@ -6,7 +6,7 @@ use hyper::service::service_fn;
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
 
 use super::CosmosApp;
-use crate::config::Config;
+use crate::config::get_config;
 use crate::logging;
 
 pub struct HTTPServer<T: CosmosApp + 'static> {
@@ -28,7 +28,7 @@ impl<T: CosmosApp + 'static> HTTPServer<T> {
         self.finish = Some(tx);
 
         let app = Arc::new(self.app);
-        let conf = Config::get();
+        let conf = get_config();
         let addr = conf.api.addr.parse().unwrap();
         logging::info(&format!("listening on {}", addr));
 

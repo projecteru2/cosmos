@@ -6,7 +6,7 @@ use std::sync::Arc;
 use futures::future::ok;
 use futures::Future;
 use hyper::{Client, StatusCode};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use shiplift::rep::ContainerDetails;
 use shiplift::Docker;
 use tokio::net::tcp::TcpStream;
@@ -15,8 +15,9 @@ use super::Node;
 use super::Sandbox;
 use crate::libs::get_cache;
 use crate::logging;
+use crate::orchestrator::get_orchestrator;
 
-#[derive(Default, Deserialize)]
+#[derive(Default, Deserialize, Serialize)]
 struct HealthCheck {
     tcp_ports: Vec<String>,
     http_port: String,
@@ -24,23 +25,24 @@ struct HealthCheck {
     http_code: u16,
 }
 
-#[derive(Default, Deserialize)]
+#[derive(Default, Deserialize, Serialize)]
 struct EruMeta {
     publish: Vec<String>,
     health_check: HealthCheck,
 }
 
-#[derive(Default, Deserialize)]
+#[derive(Default, Deserialize, Serialize)]
 struct ContainerMeta {
     id: String,
     running: bool,
     labels: HashMap<String, String>,
     networks: HashMap<String, String>,
     healthy: bool,
+    #[serde(skip_serializing)]
     eru: EruMeta,
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize)]
 pub struct EruContainer {
     meta: ContainerMeta,
     pid: u64,
@@ -53,6 +55,7 @@ pub struct EruContainer {
     memory: u64,
     local_ip: String,
 
+    #[serde(skip_serializing)]
     docker: Arc<Docker>,
 }
 
@@ -72,7 +75,10 @@ impl Sandbox for EruContainer {
         }
     }
 
-    fn report(&self) {}
+    fn report(&self) {
+        let orc = get_orchestrator();
+        orc.deploy_container_stats(&self);
+    }
 }
 
 impl EruContainer {
@@ -234,6 +240,22 @@ impl EruContainer {
             .wait()
             .unwrap();
         healthy.into_inner()
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+
+    pub fn get_id(&self) -> String {
+        self.meta.id.clone()
+    }
+
+    pub fn get_appname(&self) -> String {
+        self.name.clone()
+    }
+
+    pub fn get_entrypoint(&self) -> String {
+        self.entrypoint.clone()
     }
 }
 

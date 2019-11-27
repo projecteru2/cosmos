@@ -4,7 +4,7 @@ mod core_grpc;
 use grpc::ClientStubExt;
 
 use super::Orchestrator;
-use crate::config::Config;
+use crate::config::get_config;
 use crate::model::EruContainer;
 use crate::model::Node;
 use core_grpc::{CoreRPC, CoreRPCClient};
@@ -31,12 +31,26 @@ impl Orchestrator for Eru {
 
     fn update_node(&self) {}
 
-    fn deploy_container_stats(&self, container: Self::Sandbox) {}
+    fn deploy_container_stats(&self, container: &Self::Sandbox) {
+        let conf = get_config();
+        let req = core::ContainerDeployedOptions {
+            id: container.get_id(),
+            appname: container.get_appname(),
+            entrypoint: container.get_entrypoint(),
+            nodename: conf.hostname.clone(),
+            data: container.to_json().into_bytes(),
+            ..Default::default()
+        };
+        let resp = self
+            .client
+            .container_deployed(grpc::RequestOptions::new(), req);
+        resp.wait().unwrap();
+    }
 }
 
 impl Eru {
     pub fn new() -> Self {
-        let conf = Config::get();
+        let conf = get_config();
         let core_info: Vec<_> = conf.core.splitn(2, ':').collect();
         let core_port = core_info[1].to_string().parse().unwrap();
         let client_conf = Default::default();

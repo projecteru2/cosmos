@@ -1,6 +1,6 @@
 use regex::Regex;
 
-use crate::config;
+use crate::config::get_config;
 use crate::orchestrator::get_orchestrator;
 
 pub struct Node {
@@ -11,7 +11,7 @@ pub struct Node {
 impl Node {
     pub fn get_current() -> Self {
         let orche = get_orchestrator();
-        let conf = config::Config::get();
+        let conf = get_config();
         orche.get_node(&conf.hostname)
     }
 

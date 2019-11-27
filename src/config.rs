@@ -141,7 +141,7 @@ impl Config {
         }
     }
 
-    pub fn get() -> &'static Config {
+    fn get() -> &'static Config {
         unsafe { CONFIG.as_ref().expect("config not init") }
     }
 
@@ -236,4 +236,8 @@ pub fn init() {
     let yaml = load_yaml!("cli.yaml");
     let matches = App::from_yaml(yaml).get_matches();
     Config::from_matches(matches);
+}
+
+pub fn get_config() -> &'static Config {
+    Config::get()
 }

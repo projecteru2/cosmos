@@ -2,7 +2,7 @@ use slog;
 use slog::Drain;
 use slog_term::PlainSyncDecorator;
 
-use crate::config::Config;
+use crate::config::get_config;
 
 static mut LOG: Option<Log> = None;
 
@@ -33,7 +33,7 @@ impl Log {
 }
 
 pub fn init() {
-    let conf = Config::get();
+    let conf = get_config();
     let level = match conf.log_level.to_lowercase().as_str() {
         "panic" | "fatal" => slog::Level::Critical,
         "error" => slog::Level::Error,
