@@ -1,9 +1,11 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use futures::future::ok;
+use futures::sync::oneshot;
 use futures::Future;
 use hyper::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -61,6 +63,7 @@ pub struct EruContainer {
 
 impl Sandbox for EruContainer {
     fn started(&self) {
+        println!("started");
         if self.has_resurged() {
             self.report();
         }
@@ -78,6 +81,9 @@ impl Sandbox for EruContainer {
     fn report(&self) {
         let orc = get_orchestrator();
         orc.deploy_container_stats(&self);
+
+        let cache = get_cache();
+        cache.set(self.get_id(), self.meta.healthy);
     }
 }
 
@@ -116,38 +122,57 @@ impl EruContainer {
 }
 
 impl EruContainer {
-    pub fn new(id: String, docker: Arc<Docker>) -> Option<Self> {
-        let details = docker.containers().get(&id).inspect().wait().unwrap();
-        if !Self::validate(&details) {
-            logging::error(&format!("not eru container: {}", id));
-            return None;
-        }
+    pub fn new(id: String, docker: Arc<Docker>) -> oneshot::Receiver<Option<Self>> {
+        let (tx, rx) = oneshot::channel();
+        tokio::spawn(
+            docker
+                .containers()
+                .get(&id)
+                .inspect()
+                .and_then(move |details| {
+                    if !Self::validate(&details) {
+                        logging::error(&format!("not eru container: {}", id));
+                        return tx.send(None).map_err(|_| {
+                            logging::error("failed to send eru container");
+                            shiplift::Error::IO(io::Error::new(io::ErrorKind::Other, "oh no!"))
+                        });
+                    }
 
-        let (name, entrypoint, ident) = parse_container_name(&details);
-        let (local_ip, networks) = parse_container_networks(&details);
-        let mut container = EruContainer {
-            meta: ContainerMeta {
-                id: id,
-                running: (&details).state.running,
-                labels: (&details).config.labels.as_ref().unwrap().clone(),
-                networks,
-                ..Default::default()
-            },
-            pid: (&details).state.pid,
-            name,
-            entrypoint,
-            ident,
-            local_ip,
-            // TODO: cpu_quota, cpu_period
-            memory: (&details).host_config.memory.unwrap(),
+                    let (name, entrypoint, ident) = parse_container_name(&details);
+                    let (local_ip, networks) = parse_container_networks(&details);
+                    let mut container = EruContainer {
+                        meta: ContainerMeta {
+                            id: id,
+                            running: (&details).state.running,
+                            labels: (&details).config.labels.as_ref().unwrap().clone(),
+                            networks,
+                            ..Default::default()
+                        },
+                        pid: (&details).state.pid,
+                        name,
+                        entrypoint,
+                        ident,
+                        local_ip,
+                        // TODO: cpu_quota, cpu_period
+                        memory: (&details).host_config.memory.unwrap(),
 
-            docker: docker.clone(),
+                        docker: docker.clone(),
 
-            ..Default::default()
-        };
+                        ..Default::default()
+                    };
 
-        container.post_init(details);
-        Some(container)
+                    container.post_init(details);
+                    tx.send(Some(container)).map_err(|_| {
+                        logging::error("failed to send eru container");
+                        shiplift::Error::IO(io::Error::new(io::ErrorKind::Other, "oh no!"))
+                    })
+                })
+                .map_err(|err| {
+                    logging::error(&format!("failed to fetch container inspect: {}", err))
+                })
+                .map(|_| ()),
+        );
+        rx
     }
 
     fn validate(details: &ContainerDetails) -> bool {

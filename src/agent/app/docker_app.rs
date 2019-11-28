@@ -1,6 +1,8 @@
-use futures::Stream;
 use std::sync::Arc;
 
+use futures::future::Future;
+use futures::sync::oneshot;
+use futures::Stream;
 use shiplift::builder::{EventFilter, EventFilterType, EventsOptions};
 use shiplift::errors::Error as DockerError;
 use shiplift::rep::Event as DockerEvent;
@@ -55,22 +57,34 @@ impl CosmosApp for ContainerApp {
                 ..
             } => {
                 logging::info(&format!("{} event for container {}", action, id));
-                if let Some(container) = self.get_sandbox(id) {
-                    match action.as_str() {
-                        "start" => {
-                            container.started();
-                        }
+                tokio::spawn(
+                    self.get_sandbox(id)
+                        .and_then(move |maybe_container| {
+                            if let Some(container) = maybe_container {
+                                match action.as_str() {
+                                    "start" => {
+                                        container.started();
+                                    }
 
-                        "die" => {
-                            container.died();
-                        }
-                        _ => {
-                            logging::info(&format!("ignore container event: {}", action));
-                        }
-                    }
-                } else {
-                    logging::info(&format!("invalid eru container"));
-                };
+                                    "die" => {
+                                        container.died();
+                                    }
+                                    _ => {
+                                        logging::info(&format!(
+                                            "ignore container event: {}",
+                                            action
+                                        ));
+                                    }
+                                }
+                            } else {
+                                logging::info(&format!("invalid eru container"));
+                            }
+                            Ok(())
+                        })
+                        .map_err(|err| {
+                            logging::error(&format!("failed to get sandbox: {:#?}", err));
+                        }),
+                );
             }
             _ => {
                 logging::info(&format!("other type of event: {:#?}", event));
@@ -84,7 +98,22 @@ impl CosmosApp for ContainerApp {
         Box::new(self.docker.events(&opts))
     }
 
-    fn get_sandbox(&self, id: String) -> Option<Self::Sandbox> {
-        EruContainer::new(id, self.docker.clone())
+    fn get_sandbox(&self, id: String) -> oneshot::Receiver<Option<Self::Sandbox>> {
+        let (tx, rx) = oneshot::channel();
+        let docker = self.docker.clone();
+        tokio::spawn(
+            EruContainer::new(id, docker)
+                .and_then(move |maybe_container| {
+                    tx.send(maybe_container).map_err(|_| {
+                        logging::error("failed to send maybe_conatiner");
+                        oneshot::Canceled {}
+                    })
+                })
+                .map_err(|err| {
+                    logging::error(&format!("failed to create eru container: {:#?}", err))
+                })
+                .map(|_| ()),
+        );
+        rx
     }
 }

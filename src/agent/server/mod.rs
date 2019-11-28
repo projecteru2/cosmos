@@ -39,7 +39,7 @@ impl<T: CosmosApp + 'static> HTTPServer<T> {
             })
             //.with_graceful_shutdown(rx)
             .map_err(|err| {
-                logging::error(&format!("server error: {}", err));
+                logging::error(&format!("server error: {:#?}", err));
             });
 
         hyper::rt::spawn(server);

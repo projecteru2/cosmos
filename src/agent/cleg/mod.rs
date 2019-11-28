@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use futures::Future;
 use futures::Stream;
+use tokio::prelude::Future;
 
 use super::CosmosApp;
 use crate::logging;
@@ -20,13 +20,11 @@ impl<T: CosmosApp> Cleg<T> {
         let watcher = self
             .app
             .watch()
-            .for_each(move |e| {
-                app.clone().handle_events(e);
+            .for_each(move |event| {
+                app.clone().handle_events(event);
                 Ok(())
             })
-            .map_err(|e| {
-                logging::error(&format!("error: {:#?}", e));
-            });
+            .map_err(|err| logging::error(&format!("failed to watch docker events: {:#?}", err)));
 
         logging::info("docker event watcher starts");
         tokio::spawn(watcher);

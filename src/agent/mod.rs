@@ -2,6 +2,7 @@ pub mod app;
 mod cleg;
 mod server;
 
+use futures::sync::oneshot;
 use futures::Stream;
 
 use cleg::Cleg;
@@ -41,5 +42,5 @@ pub trait CosmosApp: Sync {
 
     fn watch(&self) -> Box<dyn Stream<Item = Self::Event, Error = Self::Error> + Send>;
 
-    fn get_sandbox(&self, id: String) -> Option<Self::Sandbox>;
+    fn get_sandbox(&self, id: String) -> oneshot::Receiver<Option<Self::Sandbox>>;
 }
