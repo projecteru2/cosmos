@@ -1,3 +1,3 @@
-mod cache;
-
-pub use cache::{get_cache, HealthCache};
+pub fn pp<'a>(object: &'a dyn std::fmt::Debug) {
+    println!("{:#?}", object);
+}

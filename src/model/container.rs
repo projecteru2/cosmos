@@ -15,7 +15,7 @@ use tokio::net::tcp::TcpStream;
 
 use super::Node;
 use super::Sandbox;
-use crate::libs::get_cache;
+use crate::config::get_config;
 use crate::logging;
 use crate::orchestrator::get_orchestrator;
 
@@ -29,8 +29,10 @@ struct HealthCheck {
 
 #[derive(Default, Deserialize, Serialize)]
 struct EruMeta {
-    publish: Vec<String>,
-    health_check: HealthCheck,
+    #[serde(rename = "Publish")]
+    publish: Option<Vec<String>>,
+    #[serde(rename = "HealthCheck")]
+    health_check: Option<HealthCheck>,
 }
 
 #[derive(Default, Deserialize, Serialize)]
@@ -61,61 +63,34 @@ pub struct EruContainer {
     docker: Arc<Docker>,
 }
 
+pub struct ContainerStatus {
+    pub id: String,
+    pub running: bool,
+    pub healthy: bool,
+    pub networks: HashMap<String, String>,
+    pub extension: Vec<u8>,
+    pub ttl: i64,
+}
+
 impl Sandbox for EruContainer {
     fn started(&self) {
-        println!("started");
-        if self.has_resurged() {
-            self.report();
-        }
+        self.report();
 
         let collector = self.collect_logs();
         tokio::spawn(collector);
     }
 
     fn died(&self) {
-        if self.has_relapsed() {
-            self.report();
-        }
+        self.report();
     }
 
     fn report(&self) {
         let orc = get_orchestrator();
         orc.deploy_container_stats(&self);
-
-        let cache = get_cache();
-        cache.set(self.get_id(), self.meta.healthy);
     }
 }
 
 impl EruContainer {
-    fn has_resurged(&self) -> bool {
-        let cache = get_cache();
-        match cache.get(&self.meta.id) {
-            Some(prev_healthy) => {
-                if !prev_healthy && self.meta.healthy {
-                    true
-                } else {
-                    false
-                }
-            }
-            None => self.meta.healthy,
-        }
-    }
-
-    fn has_relapsed(&self) -> bool {
-        let cache = get_cache();
-        match cache.get(&self.meta.id) {
-            Some(prev_healthy) => {
-                if prev_healthy && !self.meta.healthy {
-                    true
-                } else {
-                    false
-                }
-            }
-            None => !self.meta.healthy,
-        }
-    }
-
     fn collect_logs(&self) -> impl Future<Item = (), Error = ()> {
         ok::<(), ()>(())
     }
@@ -205,10 +180,15 @@ impl EruContainer {
     }
 
     fn check_tcp_health(&self) -> bool {
+        if self.meta.eru.health_check.is_none() {
+            return true;
+        }
+
         let healthy = RefCell::new(false);
-        for tcp_port in &self.meta.eru.health_check.tcp_ports {
+        for tcp_port in &self.meta.eru.health_check.as_ref().unwrap().tcp_ports {
             let tcp_netloc = format!("{}:{}", self.local_ip, tcp_port);
             let addr = tcp_netloc.parse::<SocketAddr>().unwrap();
+            crate::libs::pp(&addr);
             TcpStream::connect(&addr)
                 .map(|_res| {
                     logging::debug(&format!("tcp check for container {} passes", self.meta.id));
@@ -228,13 +208,16 @@ impl EruContainer {
     }
 
     fn check_http_health(&self) -> bool {
+        if self.meta.eru.health_check.is_none() {
+            return true;
+        }
+
+        let health_check = self.meta.eru.health_check.as_ref().unwrap();
         let healthy = RefCell::new(false);
-        let expected_status = StatusCode::from_u16(self.meta.eru.health_check.http_code).unwrap();
+        let expected_status = StatusCode::from_u16(health_check.http_code).unwrap();
         let http_uri = format!(
             "http://{}:{}{}",
-            self.local_ip,
-            self.meta.eru.health_check.http_port,
-            self.meta.eru.health_check.http_url
+            self.local_ip, health_check.http_port, health_check.http_url
         )
         .parse()
         .unwrap();
@@ -267,20 +250,16 @@ impl EruContainer {
         healthy.into_inner()
     }
 
-    pub fn to_json(&self) -> String {
-        serde_json::to_string(self).unwrap()
-    }
-
-    pub fn get_id(&self) -> String {
-        self.meta.id.clone()
-    }
-
-    pub fn get_appname(&self) -> String {
-        self.name.clone()
-    }
-
-    pub fn get_entrypoint(&self) -> String {
-        self.entrypoint.clone()
+    pub fn status(&self) -> ContainerStatus {
+        let conf = get_config();
+        return ContainerStatus {
+            id: self.meta.id.clone(),
+            running: self.meta.running,
+            healthy: self.meta.healthy,
+            networks: self.meta.networks.clone(),
+            extension: serde_json::to_vec(&self.meta.labels).unwrap(),
+            ttl: (2 * conf.health_check_interval) as i64,
+        };
     }
 }
 

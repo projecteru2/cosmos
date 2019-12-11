@@ -16,6 +16,7 @@ impl Node {
     }
 
     pub fn ip_address(&self) -> String {
+        // TODO: unix endpoint
         let re = Regex::new(r"tcp://(?P<ip>[^:]+):(?P<port>\d+)").unwrap();
         let caps = re.captures(&self.endpoint).unwrap();
         caps.name("ip").unwrap().as_str().to_string()

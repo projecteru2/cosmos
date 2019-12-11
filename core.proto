@@ -3,42 +3,45 @@ syntax = "proto3";
 package pb;
 
 service CoreRPC {
+    rpc ListNetworks(ListNetworkOptions) returns (Networks) {};
+
     rpc ListPods(Empty) returns (Pods) {};
     rpc AddPod(AddPodOptions) returns (Pod) {};
     rpc RemovePod(RemovePodOptions) returns (Empty) {};
     rpc GetPod(GetPodOptions) returns (Pod) {};
     rpc GetPodResource(GetPodOptions) returns (PodResource) {};
+    rpc ListPodNodes(ListNodesOptions) returns (Nodes) {};
 
     rpc AddNode(AddNodeOptions) returns (Node) {};
     rpc RemoveNode(RemoveNodeOptions) returns (Empty) {};
     rpc SetNode(SetNodeOptions) returns (Node) {};
     rpc GetNode(GetNodeOptions) returns (Node) {};
     rpc GetNodeResource(GetNodeOptions) returns (NodeResource) {};
+
     rpc GetContainer(ContainerID) returns (Container) {};
     rpc GetContainers(ContainerIDs) returns (Containers) {};
-    rpc GetNodeByName(GetNodeOptions) returns (Node) {};
-    rpc ListPodNodes(ListNodesOptions) returns (Nodes) {};
-    rpc ListNetworks(ListNetworkOptions) returns (Networks) {};
-    rpc ListNodeContainers(GetNodeOptions) returns (Containers) {};
     rpc ListContainers(ListContainersOptions) returns (stream Container) {};
-
-    rpc ContainerDeployed(ContainerDeployedOptions) returns (Empty) {};
+    rpc ListNodeContainers(GetNodeOptions) returns (Containers) {};
+    rpc GetContainersStatus(ContainerIDs) returns (ContainersStatus) {};
+    rpc SetContainersStatus(SetContainersStatusOptions) returns (ContainersStatus) {};
+    rpc ContainerStatusStream(ContainerStatusStreamOptions) returns (stream ContainerStatusStreamMessage) {};
 
     rpc Copy(CopyOptions) returns (stream CopyMessage) {};
     rpc Send(SendOptions) returns (stream SendMessage) {};
+
     rpc BuildImage(BuildImageOptions) returns (stream BuildImageMessage) {};
     rpc CacheImage(CacheImageOptions) returns (stream CacheImageMessage) {};
     rpc RemoveImage(RemoveImageOptions) returns (stream RemoveImageMessage) {};
-    rpc DeployStatus(DeployStatusOptions) returns (stream DeployStatusMessage) {};
-    rpc RunAndWait(stream RunAndWaitOptions) returns (stream AttachContainerMessage) {};
+    
     rpc CreateContainer(DeployOptions) returns (stream CreateContainerMessage) {};
     rpc ReplaceContainer(ReplaceOptions) returns (stream ReplaceContainerMessage) {};
     rpc RemoveContainer(RemoveContainerOptions) returns (stream RemoveContainerMessage) {};
     rpc DissociateContainer(DissociateContainerOptions) returns (stream DissociateContainerMessage) {};
     rpc ControlContainer(ControlContainerOptions) returns (stream ControlContainerMessage) {};
-    rpc ExecuteContainer(stream ExecuteContainerOptions) returns (stream AttachContainerMessage) {};
     rpc ReallocResource(ReallocOptions) returns (stream ReallocResourceMessage) {};
     rpc LogStream(ContainerID) returns (stream LogStreamMessage) {};
+    rpc RunAndWait(stream RunAndWaitOptions) returns (stream AttachContainerMessage) {};
+    rpc ExecuteContainer(stream ExecuteContainerOptions) returns (stream AttachContainerMessage) {};
 }
 
 message Empty {}
@@ -49,21 +52,6 @@ message ListContainersOptions {
     string nodename = 3;
     map<string, string> labels = 4;
     int64 limit = 5;
-}
-
-message DeployStatusOptions {
-    string appname = 1;
-    string entrypoint = 2;
-    string nodename = 3;
-}
-
-message DeployStatusMessage {
-    string action = 1;
-    string appname = 2;
-    string entrypoint = 3;
-    string nodename = 4;
-    string id = 5;
-    bytes data = 6;
 }
 
 // 对的, protobuf 就是这样...
@@ -139,14 +127,13 @@ message NodeAvailable {
 
 message SetNodeOptions {
     string nodename = 1;
-    string podname = 2;
-    int32 status = 3;
-    map<string, int32> delta_cpu = 4;
-    int64 delta_memory = 5;
-    int64 delta_storage = 6;
-    map<string, int64> delta_numa_memory = 7;
-    map<string, string> numa = 8;
-    map<string, string> labels = 9;
+    int32 status = 2;
+    map<string, int32> delta_cpu = 3;
+    int64 delta_memory = 4;
+    int64 delta_storage = 5;
+    map<string, int64> delta_numa_memory = 6;
+    map<string, string> numa = 7;
+    map<string, string> labels = 8;
 }
 
 message Container {
@@ -162,15 +149,39 @@ message Container {
     map<string, string> publish = 10;
     string image = 11;
     int64 storage = 12;
-    bytes status_data = 13;
+    ContainerStatus status = 13;
 }
 
-message ContainerDeployedOptions {
+message ContainerStatus {
     string id = 1;
-    string appname = 2;
-    string entrypoint = 3;
-    string nodename = 4;
-    bytes data = 5;
+    bool running = 2;
+    bool healthy = 3;
+    map<string, string> networks = 4;
+    bytes extension = 5;
+    int64 ttl = 6;
+}
+
+message ContainersStatus {
+    repeated ContainerStatus status = 1;
+}
+
+message ContainerStatusStreamMessage {
+    string id = 1;
+    Container container = 2;
+    ContainerStatus status = 3;
+    string error = 4;
+    bool delete = 5;
+}
+
+message SetContainersStatusOptions {
+    repeated ContainerStatus status = 1;
+}
+
+message ContainerStatusStreamOptions {
+    string appname = 1;
+    string entrypoint = 2;
+    string nodename = 3;
+    map<string, string> labels = 4;
 }
 
 message Containers {
@@ -232,17 +243,17 @@ message AddNodeOptions {
 
 message RemoveNodeOptions {
     string nodename = 1;
-    string podname = 2;
 }
 
 message GetNodeOptions {
-    string podname = 1;
-    string nodename = 2;
+    string nodename = 1;
+    map<string, string> labels = 2;
 }
 
 message ListNodesOptions {
     string podname = 1;
     bool all = 2;
+    map<string, string> labels = 3;
 }
 
 message Build {
@@ -258,6 +269,7 @@ message Build {
     map<string, string> artifacts = 10;
     map<string, string> cache = 11;
     string stop_signal = 12;
+    bool security = 13;
 }
 
 message Builds {

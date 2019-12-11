@@ -17,33 +17,40 @@ impl Orchestrator for Eru {
     type Sandbox = EruContainer;
 
     fn get_node(&self, name: &String) -> Node {
+        println!("get node from eru core: {}", name);
         let req = core::GetNodeOptions {
             nodename: name.to_string(),
             ..Default::default()
         };
         let resp = self.client.get_node(grpc::RequestOptions::new(), req);
-        let (_, node_info, _) = resp.wait().unwrap();
+        let (_, node, _) = resp.wait().unwrap();
         Node {
-            name: node_info.name,
-            endpoint: node_info.endpoint,
+            name: node.name,
+            endpoint: node.endpoint,
         }
     }
 
     fn update_node(&self) {}
 
     fn deploy_container_stats(&self, container: &Self::Sandbox) {
-        let conf = get_config();
-        let req = core::ContainerDeployedOptions {
-            id: container.get_id(),
-            appname: container.get_appname(),
-            entrypoint: container.get_entrypoint(),
-            nodename: conf.hostname.clone(),
-            data: container.to_json().into_bytes(),
+        let mut status = protobuf::RepeatedField::new();
+        let state = container.status();
+        status.push(core::ContainerStatus {
+            id: state.id,
+            running: state.running,
+            healthy: state.healthy,
+            networks: state.networks,
+            extension: state.extension,
+            ttl: state.ttl,
+            ..Default::default()
+        });
+        let req = core::SetContainersStatusOptions {
+            status: status,
             ..Default::default()
         };
         let resp = self
             .client
-            .container_deployed(grpc::RequestOptions::new(), req);
+            .set_containers_status(grpc::RequestOptions::new(), req);
         resp.wait().unwrap();
     }
 }
