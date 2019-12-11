@@ -1,10 +1,9 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use futures::future::ok;
+use futures::future::join_all;
+use futures::future::{err, ok};
 use futures::sync::oneshot;
 use futures::Future;
 use hyper::{Client, StatusCode};
@@ -19,7 +18,7 @@ use crate::config::get_config;
 use crate::logging;
 use crate::orchestrator::get_orchestrator;
 
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default, Deserialize, Serialize, Clone)]
 struct HealthCheck {
     tcp_ports: Vec<String>,
     http_port: String,
@@ -104,18 +103,21 @@ impl EruContainer {
                 .containers()
                 .get(&id)
                 .inspect()
-                .and_then(move |details| {
+                .map_err(|_| {
+                    logging::error("failed to inspect eru container");
+                    ()
+                })
+                .and_then(|details| {
                     if !Self::validate(&details) {
-                        logging::error(&format!("not eru container: {}", id));
-                        return tx.send(None).map_err(|_| {
-                            logging::error("failed to send eru container");
-                            shiplift::Error::IO(io::Error::new(io::ErrorKind::Other, "oh no!"))
-                        });
+                        err(())
+                    } else {
+                        ok(details)
                     }
-
+                })
+                .and_then(move |details| {
                     let (name, entrypoint, ident) = parse_container_name(&details);
                     let (local_ip, networks) = parse_container_networks(&details);
-                    let mut container = EruContainer {
+                    let container = EruContainer {
                         meta: ContainerMeta {
                             id: id,
                             running: (&details).state.running,
@@ -135,17 +137,15 @@ impl EruContainer {
 
                         ..Default::default()
                     };
-
-                    container.post_init(details);
-                    tx.send(Some(container)).map_err(|_| {
-                        logging::error("failed to send eru container");
-                        shiplift::Error::IO(io::Error::new(io::ErrorKind::Other, "oh no!"))
+                    Self::post_init(container, details).map(|container| Some(container))
+                })
+                .or_else(|_| ok(None))
+                .and_then(|maybe_container| {
+                    tx.send(maybe_container).map_err(|_| {
+                        logging::error("send container failed");
+                        ()
                     })
-                })
-                .map_err(|err| {
-                    logging::error(&format!("failed to fetch container inspect: {}", err))
-                })
-                .map(|_| ()),
+                }),
         );
         rx
     }
@@ -168,90 +168,99 @@ impl EruContainer {
         }
     }
 
-    fn post_init(&mut self, _details: ContainerDetails) {
+    fn post_init(
+        mut container: Self,
+        _details: ContainerDetails,
+    ) -> impl Future<Item = Self, Error = ()> {
         // TODO: calculate cpu_num
 
-        self.meta.eru = serde_json::from_str(&self.meta.labels["ERU_META"]).unwrap();
-        self.check_health();
+        container.meta.eru = serde_json::from_str(&container.meta.labels["ERU_META"]).unwrap();
+        container.check_health().map(|healthy| {
+            container.meta.healthy = healthy;
+            container
+        })
     }
 
-    fn check_health(&mut self) {
-        self.meta.healthy = self.check_tcp_health() && self.check_http_health();
-    }
-
-    fn check_tcp_health(&self) -> bool {
-        if self.meta.eru.health_check.is_none() {
-            return true;
-        }
-
-        let healthy = RefCell::new(false);
-        for tcp_port in &self.meta.eru.health_check.as_ref().unwrap().tcp_ports {
-            let tcp_netloc = format!("{}:{}", self.local_ip, tcp_port);
-            let addr = tcp_netloc.parse::<SocketAddr>().unwrap();
-            crate::libs::pp(&addr);
-            TcpStream::connect(&addr)
-                .map(|_res| {
-                    logging::debug(&format!("tcp check for container {} passes", self.meta.id));
-                    *healthy.borrow_mut() = true;
-                })
-                .map_err(|err| {
-                    logging::info(&format!(
-                        "tcp check for container {} fails: {}",
-                        self.meta.id, err
-                    ));
-                    *healthy.borrow_mut() = false;
-                })
-                .wait()
-                .unwrap();
-        }
-        healthy.into_inner()
-    }
-
-    fn check_http_health(&self) -> bool {
-        if self.meta.eru.health_check.is_none() {
-            return true;
-        }
-
-        let health_check = self.meta.eru.health_check.as_ref().unwrap();
-        let healthy = RefCell::new(false);
-        let expected_status = StatusCode::from_u16(health_check.http_code).unwrap();
-        let http_uri = format!(
-            "http://{}:{}{}",
-            self.local_ip, health_check.http_port, health_check.http_url
-        )
-        .parse()
-        .unwrap();
-        let client = Client::new();
-        client
-            .get(http_uri)
-            .map(|res| {
-                let status_code = res.status();
-                logging::debug(&format!(
-                    "http check for container {} got status code: {}",
-                    self.meta.id, &status_code
-                ));
-                if status_code != expected_status {
-                    logging::info(&format!(
-                        "http check for container {} fails: {}",
-                        self.meta.id, status_code
-                    ));
-                    *healthy.borrow_mut() = false;
-                }
+    fn check_health(&mut self) -> impl Future<Item = bool, Error = ()> {
+        self.check_tcp_health()
+            .join(self.check_http_health())
+            .then(|result| match result {
+                Ok((true, true)) => ok(true),
+                Ok(_) => ok(false),
+                Err(_) => ok(false),
             })
-            .map_err(|err| {
-                logging::info(&format!(
-                    "http check for container {} fails: {}",
-                    self.meta.id, err
-                ));
-                *healthy.borrow_mut() = false;
+    }
+
+    fn check_tcp_health(&self) -> impl Future<Item = bool, Error = ()> {
+        let fut = if self.meta.eru.health_check.is_none() {
+            ok(true)
+        } else {
+            err(())
+        };
+
+        let local_ip = self.local_ip.clone();
+        let tcp_ports = self
+            .meta
+            .eru
+            .health_check
+            .as_ref()
+            .unwrap()
+            .tcp_ports
+            .clone();
+        fut.and_then(|_| ok(true)).or_else(move |_| {
+            let mut connections = vec![];
+            for tcp_port in tcp_ports {
+                let tcp_netloc = format!("{}:{}", local_ip, tcp_port);
+                let addr = tcp_netloc.parse::<SocketAddr>().unwrap();
+                crate::libs::pp(&addr);
+                connections.push(TcpStream::connect(&addr));
+            }
+
+            join_all(connections).then(|result| match result {
+                Ok(_) => ok(true),
+                Err(_) => ok(false),
             })
-            .wait()
+        })
+    }
+
+    fn check_http_health(&self) -> impl Future<Item = bool, Error = ()> {
+        let fut = if self.meta.eru.health_check.is_none() {
+            ok(true)
+        } else {
+            err(())
+        };
+
+        let health_check = self.meta.eru.health_check.as_ref().unwrap().clone();
+        let local_ip = self.local_ip.clone();
+        fut.and_then(|_| ok(true)).or_else(move |_| {
+            let expected_status = StatusCode::from_u16(health_check.http_code).unwrap();
+            let http_uri = format!(
+                "http://{}:{}{}",
+                local_ip, health_check.http_port, health_check.http_url
+            )
+            .parse()
             .unwrap();
-        healthy.into_inner()
+            let client = Client::new();
+            client.get(http_uri).then(move |result| match result {
+                Ok(response) => {
+                    let status_code = response.status();
+                    if status_code != expected_status {
+                        ok(false)
+                    } else {
+                        ok(true)
+                    }
+                }
+                Err(_) => ok(false),
+            })
+        })
     }
 
     pub fn status(&self) -> ContainerStatus {
         let conf = get_config();
+        println!(
+            "to_vec: {:#?}",
+            serde_json::to_vec(&self.meta.labels).unwrap()
+        );
         return ContainerStatus {
             id: self.meta.id.clone(),
             running: self.meta.running,
