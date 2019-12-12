@@ -20,9 +20,13 @@ use crate::orchestrator::get_orchestrator;
 
 #[derive(Default, Deserialize, Serialize, Clone, Debug)]
 struct HealthCheck {
+    #[serde(rename = "TCPPorts")]
     tcp_ports: Vec<String>,
+    #[serde(rename = "HTTPPort")]
     http_port: String,
+    #[serde(rename = "HTTPURL")]
     http_url: String,
+    #[serde(rename = "HTTPCode")]
     http_code: u16,
 }
 
@@ -85,7 +89,7 @@ impl Sandbox for EruContainer {
 
     fn report(&self) {
         let orc = get_orchestrator();
-        orc.deploy_container_stats(&self);
+        orc.set_container_status(&self);
     }
 }
 
@@ -194,6 +198,7 @@ impl EruContainer {
 
     fn check_tcp_health(&self) -> impl Future<Item = bool, Error = ()> {
         let fut = if self.meta.eru.health_check.is_none() {
+            logging::debug("no health check, tcp healthy");
             ok(true)
         } else {
             err(())
@@ -205,20 +210,27 @@ impl EruContainer {
             let mut connections = vec![];
             for tcp_port in health_check.unwrap().tcp_ports {
                 let tcp_netloc = format!("{}:{}", local_ip, tcp_port);
+                logging::debug(&format!("checking tcp: {}", tcp_netloc));
                 let addr = tcp_netloc.parse::<SocketAddr>().unwrap();
-                crate::libs::pp(&addr);
                 connections.push(TcpStream::connect(&addr));
             }
 
             join_all(connections).then(|result| match result {
-                Ok(_) => ok(true),
-                Err(_) => ok(false),
+                Ok(_) => {
+                    logging::debug("tcp connections established, tcp healthy");
+                    ok(true)
+                }
+                Err(e) => {
+                    logging::debug(&format!("tcp connections failed: {}, tcp unhealthy", e));
+                    ok(false)
+                }
             })
         })
     }
 
     fn check_http_health(&self) -> impl Future<Item = bool, Error = ()> {
         let fut = if self.meta.eru.health_check.is_none() {
+            logging::debug("no healthcheak, http healthy");
             ok(true)
         } else {
             err(())
@@ -226,28 +238,52 @@ impl EruContainer {
 
         let health_check = self.meta.eru.health_check.clone();
         let local_ip = self.local_ip.clone();
-        fut.and_then(|_| ok(true)).or_else(move |_| {
-            let health_check = health_check.unwrap();
-            let expected_status = StatusCode::from_u16(health_check.http_code).unwrap();
-            let http_uri = format!(
-                "http://{}:{}{}",
-                local_ip, health_check.http_port, health_check.http_url
-            )
-            .parse()
-            .unwrap();
-            let client = Client::new();
-            client.get(http_uri).then(move |result| match result {
-                Ok(response) => {
-                    let status_code = response.status();
-                    if status_code != expected_status {
-                        ok(false)
-                    } else {
-                        ok(true)
-                    }
+        fut.and_then(|_| ok(true))
+            .or_else(|_| {
+                let health_check = health_check.unwrap();
+                if health_check.http_url.is_empty()
+                    || health_check.http_port.is_empty()
+                    || health_check.http_code == 0
+                {
+                    logging::debug("no http healthcheak, http healthy");
+                    ok(true)
+                } else {
+                    err(health_check)
                 }
-                Err(_) => ok(false),
             })
-        })
+            .or_else(move |health_check| {
+                let expected_status = StatusCode::from_u16(health_check.http_code).unwrap();
+                let http_uri = format!(
+                    "http://{}:{}{}",
+                    local_ip, health_check.http_port, health_check.http_url
+                )
+                .parse()
+                .unwrap();
+                logging::debug(&format!("checking http url: {}", http_uri));
+                let client = Client::new();
+                client.get(http_uri).then(move |result| match result {
+                    Ok(response) => {
+                        let status_code = response.status();
+                        if status_code != expected_status {
+                            logging::debug(&format!(
+                                "http status code: {} != {}, http unhealthy",
+                                status_code, expected_status
+                            ));
+                            ok(false)
+                        } else {
+                            logging::debug(&format!(
+                                "http status code: {}, http healthy",
+                                status_code
+                            ));
+                            ok(true)
+                        }
+                    }
+                    Err(e) => {
+                        logging::debug(&format!("http request failed: {}, http unhealthy", e));
+                        ok(false)
+                    }
+                })
+            })
     }
 
     pub fn status(&self) -> ContainerStatus {

@@ -10,7 +10,7 @@ pub trait Orchestrator {
 
     fn get_node(&self, name: &String) -> Node;
     fn update_node(&self);
-    fn deploy_container_stats(&self, sandbox: &Self::Sandbox);
+    fn set_container_status(&self, sandbox: &Self::Sandbox);
 }
 
 pub fn get_orchestrator() -> Box<dyn Orchestrator<Sandbox = EruContainer>> {

@@ -9,6 +9,8 @@ use crate::model::EruContainer;
 use crate::model::Node;
 use core_grpc::{CoreRPC, CoreRPCClient};
 
+use crate::logging;
+
 pub struct Eru {
     client: core_grpc::CoreRPCClient,
 }
@@ -32,7 +34,7 @@ impl Orchestrator for Eru {
 
     fn update_node(&self) {}
 
-    fn deploy_container_stats(&self, container: &Self::Sandbox) {
+    fn set_container_status(&self, container: &Self::Sandbox) {
         let mut status = protobuf::RepeatedField::new();
         let state = container.status();
         status.push(core::ContainerStatus {
@@ -51,7 +53,12 @@ impl Orchestrator for Eru {
         let resp = self
             .client
             .set_containers_status(grpc::RequestOptions::new(), req);
-        resp.wait().unwrap();
+        match resp.wait() {
+            Ok(_) => (),
+            Err(e) => {
+                logging::error(&format!("set container status failed: {}", e));
+            }
+        };
     }
 }
 
