@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use futures::future::Future;
-use futures::sync::oneshot;
+use futures::sync::{mpsc, oneshot};
 use futures::Stream;
 use shiplift::builder::{EventFilter, EventFilterType, EventsOptions};
 use shiplift::errors::Error as DockerError;
@@ -114,6 +114,12 @@ impl CosmosApp for ContainerApp {
                 })
                 .map(|_| ()),
         );
+        rx
+    }
+
+    fn list_sandboxes(&self) -> mpsc::Receiver<Self::Sandbox> {
+        let (tx, rx) = mpsc::channel(1_024);
+        let docker = self.docker.clone();
         rx
     }
 }

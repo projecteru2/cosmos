@@ -2,9 +2,10 @@ pub mod app;
 mod cleg;
 mod server;
 
-use futures::sync::oneshot;
+use futures::sync::{mpsc, oneshot};
 use futures::Stream;
 
+use crate::model::Sandbox;
 use cleg::Cleg;
 use server::HTTPServer;
 
@@ -30,7 +31,7 @@ impl<T: CosmosApp + 'static> Agent<T> {
 }
 
 pub trait CosmosApp: Sync {
-    type Sandbox;
+    type Sandbox: Sandbox + Send;
     type Event: std::fmt::Debug;
     type Error: std::fmt::Debug + Send;
 
@@ -38,9 +39,13 @@ pub trait CosmosApp: Sync {
         "2019-11-04".to_string()
     }
 
+    // TODO: delete
     fn handle_events(&self, event: Self::Event);
 
     fn watch(&self) -> Box<dyn Stream<Item = Self::Event, Error = Self::Error> + Send>;
 
+    // TODO: get_sandbox
     fn get_sandbox(&self, id: String) -> oneshot::Receiver<Option<Self::Sandbox>>;
+
+    fn list_sandboxes(&self) -> mpsc::Receiver<Self::Sandbox>;
 }
