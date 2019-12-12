@@ -18,7 +18,7 @@ use crate::config::get_config;
 use crate::logging;
 use crate::orchestrator::get_orchestrator;
 
-#[derive(Default, Deserialize, Serialize, Clone)]
+#[derive(Default, Deserialize, Serialize, Clone, Debug)]
 struct HealthCheck {
     tcp_ports: Vec<String>,
     http_port: String,
@@ -26,7 +26,7 @@ struct HealthCheck {
     http_code: u16,
 }
 
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default, Deserialize, Serialize, Debug)]
 struct EruMeta {
     #[serde(rename = "Publish")]
     publish: Option<Vec<String>>,
@@ -34,7 +34,7 @@ struct EruMeta {
     health_check: Option<HealthCheck>,
 }
 
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Default, Deserialize, Serialize, Debug)]
 struct ContainerMeta {
     id: String,
     running: bool,
@@ -175,6 +175,7 @@ impl EruContainer {
         // TODO: calculate cpu_num
 
         container.meta.eru = serde_json::from_str(&container.meta.labels["ERU_META"]).unwrap();
+        crate::libs::pp(&container.meta.eru);
         container.check_health().map(|healthy| {
             container.meta.healthy = healthy;
             container
@@ -199,17 +200,10 @@ impl EruContainer {
         };
 
         let local_ip = self.local_ip.clone();
-        let tcp_ports = self
-            .meta
-            .eru
-            .health_check
-            .as_ref()
-            .unwrap()
-            .tcp_ports
-            .clone();
+        let health_check = self.meta.eru.health_check.clone();
         fut.and_then(|_| ok(true)).or_else(move |_| {
             let mut connections = vec![];
-            for tcp_port in tcp_ports {
+            for tcp_port in health_check.unwrap().tcp_ports {
                 let tcp_netloc = format!("{}:{}", local_ip, tcp_port);
                 let addr = tcp_netloc.parse::<SocketAddr>().unwrap();
                 crate::libs::pp(&addr);
@@ -230,9 +224,10 @@ impl EruContainer {
             err(())
         };
 
-        let health_check = self.meta.eru.health_check.as_ref().unwrap().clone();
+        let health_check = self.meta.eru.health_check.clone();
         let local_ip = self.local_ip.clone();
         fut.and_then(|_| ok(true)).or_else(move |_| {
+            let health_check = health_check.unwrap();
             let expected_status = StatusCode::from_u16(health_check.http_code).unwrap();
             let http_uri = format!(
                 "http://{}:{}{}",
@@ -257,10 +252,6 @@ impl EruContainer {
 
     pub fn status(&self) -> ContainerStatus {
         let conf = get_config();
-        println!(
-            "to_vec: {:#?}",
-            serde_json::to_vec(&self.meta.labels).unwrap()
-        );
         return ContainerStatus {
             id: self.meta.id.clone(),
             running: self.meta.running,
