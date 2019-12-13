@@ -7,10 +7,10 @@ use futures::Future;
 use hyper::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use shiplift::rep::ContainerDetails;
-use shiplift::rep::Event as DockerEvent;
 use shiplift::Docker;
 use tokio::net::tcp::TcpStream;
 
+use super::DockerEvent;
 use super::Node;
 use super::Sandbox;
 use crate::config::get_config;
@@ -73,6 +73,7 @@ pub struct ContainerStatus {
 
 impl Sandbox for EruContainer {
     type Event = DockerEvent;
+
     fn report(&self) {
         let orc = get_orchestrator();
         orc.set_container_status(&self);
@@ -80,19 +81,11 @@ impl Sandbox for EruContainer {
 
     fn handle_event(&self, event: Self::Event) {
         match event {
-            DockerEvent {
-                ref action,
-                id: Some(id),
-                ..
-            } if action == "start" => {
+            DockerEvent { ref action, id, .. } if action == "start" => {
                 logging::info(&format!("start event for container {}", id));
                 self.started();
             }
-            DockerEvent {
-                ref action,
-                id: Some(id),
-                ..
-            } if action == "die" => {
+            DockerEvent { ref action, id, .. } if action == "die" => {
                 logging::info(&format!("die event for container {}", id));
                 self.died();
             }

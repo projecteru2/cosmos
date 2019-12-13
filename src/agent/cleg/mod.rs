@@ -9,6 +9,7 @@ use super::CosmosApp;
 use crate::config::get_config;
 use crate::logging;
 use crate::model::Sandbox;
+use crate::model::SandboxEvent;
 
 pub struct Cleg<T: CosmosApp + 'static> {
     pub app: &'static T,
@@ -32,7 +33,7 @@ impl<T: CosmosApp> Cleg<T> {
             .for_each(move |event| {
                 tokio::spawn(
                     app.clone()
-                        .get_sandbox(&event)
+                        .get_sandbox(event.sandbox_id())
                         .map(|maybe_sandbox| match maybe_sandbox {
                             Some(sandbox) => sandbox.handle_event(event),
                             None => (),

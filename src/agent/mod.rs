@@ -5,7 +5,7 @@ mod server;
 use futures::Future;
 use futures::Stream;
 
-use crate::model::Sandbox;
+use crate::model::{Sandbox, SandboxEvent};
 use cleg::Cleg;
 use server::HTTPServer;
 
@@ -32,7 +32,7 @@ impl<T: CosmosApp + 'static> Agent<T> {
 
 pub trait CosmosApp: Sync {
     type Sandbox: Sandbox<Event = Self::Event> + Send;
-    type Event: std::fmt::Debug + Send;
+    type Event: SandboxEvent + std::fmt::Debug + Send;
     type Error: std::fmt::Debug + Send;
 
     fn version(&self) -> String {
@@ -43,7 +43,7 @@ pub trait CosmosApp: Sync {
 
     fn get_sandbox(
         &self,
-        event: &Self::Event,
+        id: String,
     ) -> Box<dyn Future<Item = Option<Self::Sandbox>, Error = ()> + Send>;
 
     fn list_sandboxes(&self) -> Box<dyn Stream<Item = Self::Sandbox, Error = ()> + Send>;
