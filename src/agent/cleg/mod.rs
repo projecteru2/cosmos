@@ -30,7 +30,15 @@ impl<T: CosmosApp> Cleg<T> {
             .app
             .watch()
             .for_each(move |event| {
-                app.clone().handle_events(event);
+                tokio::spawn(
+                    app.clone()
+                        .get_sandbox(&event)
+                        .map(|maybe_sandbox| match maybe_sandbox {
+                            Some(sandbox) => sandbox.handle_event(event),
+                            None => (),
+                        })
+                        .map_err(|_| ()),
+                );
                 Ok(())
             })
             .map_err(|err| logging::error(&format!("failed to watch docker events: {:#?}", err)));

@@ -31,21 +31,17 @@ impl<T: CosmosApp + 'static> Agent<T> {
 }
 
 pub trait CosmosApp: Sync {
-    type Sandbox: Sandbox + Send;
-    type Event: std::fmt::Debug;
+    type Sandbox: Sandbox<Event = Self::Event> + Send;
+    type Event: std::fmt::Debug + Send;
     type Error: std::fmt::Debug + Send;
 
     fn version(&self) -> String {
         "2019-11-04".to_string()
     }
 
-    // TODO: delete
-    fn handle_events(&self, event: Self::Event);
-
     fn watch(&self) -> Box<dyn Stream<Item = Self::Event, Error = Self::Error> + Send>;
 
-    // TODO: get_sandbox
-    fn get_sandbox(&self, id: String) -> oneshot::Receiver<Option<Self::Sandbox>>;
+    fn get_sandbox(&self, event: &Self::Event) -> oneshot::Receiver<Option<Self::Sandbox>>;
 
     fn list_sandboxes(&self) -> mpsc::Receiver<Self::Sandbox>;
 }

@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::Arc;
 
 use futures::future::join_all;
 use futures::future::{err, ok};
@@ -9,6 +8,7 @@ use futures::Future;
 use hyper::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use shiplift::rep::ContainerDetails;
+use shiplift::rep::Event as DockerEvent;
 use shiplift::Docker;
 use tokio::net::tcp::TcpStream;
 
@@ -61,9 +61,6 @@ pub struct EruContainer {
     cpu_period: f64,
     memory: u64,
     local_ip: String,
-
-    #[serde(skip_serializing)]
-    docker: Arc<Docker>,
 }
 
 pub struct ContainerStatus {
@@ -76,6 +73,8 @@ pub struct ContainerStatus {
 }
 
 impl Sandbox for EruContainer {
+    type Event = DockerEvent;
+
     fn started(&self) {
         self.report();
 
@@ -91,6 +90,8 @@ impl Sandbox for EruContainer {
         let orc = get_orchestrator();
         orc.set_container_status(&self);
     }
+
+    fn handle_event(&self, event: Self::Event) {}
 }
 
 impl EruContainer {
@@ -100,8 +101,9 @@ impl EruContainer {
 }
 
 impl EruContainer {
-    pub fn new(id: String, docker: Arc<Docker>) -> oneshot::Receiver<Option<Self>> {
+    pub fn new(id: String) -> oneshot::Receiver<Option<Self>> {
         let (tx, rx) = oneshot::channel();
+        let docker = Docker::new();
         tokio::spawn(
             docker
                 .containers()
@@ -136,8 +138,6 @@ impl EruContainer {
                         local_ip,
                         // TODO: cpu_quota, cpu_period
                         memory: (&details).host_config.memory.unwrap(),
-
-                        docker: docker.clone(),
 
                         ..Default::default()
                     };
