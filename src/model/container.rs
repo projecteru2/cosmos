@@ -3,7 +3,6 @@ use std::net::SocketAddr;
 
 use futures::future::join_all;
 use futures::future::{err, ok};
-use futures::sync::oneshot;
 use futures::Future;
 use hyper::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -74,7 +73,35 @@ pub struct ContainerStatus {
 
 impl Sandbox for EruContainer {
     type Event = DockerEvent;
+    fn report(&self) {
+        let orc = get_orchestrator();
+        orc.set_container_status(&self);
+    }
 
+    fn handle_event(&self, event: Self::Event) {
+        match event {
+            DockerEvent {
+                ref action,
+                id: Some(id),
+                ..
+            } if action == "start" => {
+                logging::info(&format!("start event for container {}", id));
+                self.started();
+            }
+            DockerEvent {
+                ref action,
+                id: Some(id),
+                ..
+            } if action == "die" => {
+                logging::info(&format!("die event for container {}", id));
+                self.died();
+            }
+            _ => (),
+        };
+    }
+}
+
+impl EruContainer {
     fn started(&self) {
         self.report();
 
@@ -86,72 +113,53 @@ impl Sandbox for EruContainer {
         self.report();
     }
 
-    fn report(&self) {
-        let orc = get_orchestrator();
-        orc.set_container_status(&self);
-    }
-
-    fn handle_event(&self, event: Self::Event) {}
-}
-
-impl EruContainer {
     fn collect_logs(&self) -> impl Future<Item = (), Error = ()> {
         ok::<(), ()>(())
     }
 }
 
 impl EruContainer {
-    pub fn new(id: String) -> oneshot::Receiver<Option<Self>> {
-        let (tx, rx) = oneshot::channel();
+    pub fn new(id: String) -> impl Future<Item = Option<Self>, Error = ()> {
         let docker = Docker::new();
-        tokio::spawn(
-            docker
-                .containers()
-                .get(&id)
-                .inspect()
-                .map_err(|_| {
-                    logging::error("failed to inspect eru container");
-                    ()
-                })
-                .and_then(|details| {
-                    if !Self::validate(&details) {
-                        err(())
-                    } else {
-                        ok(details)
-                    }
-                })
-                .and_then(move |details| {
-                    let (name, entrypoint, ident) = parse_container_name(&details);
-                    let (local_ip, networks) = parse_container_networks(&details);
-                    let container = EruContainer {
-                        meta: ContainerMeta {
-                            id: id,
-                            running: (&details).state.running,
-                            labels: (&details).config.labels.as_ref().unwrap().clone(),
-                            networks,
-                            ..Default::default()
-                        },
-                        pid: (&details).state.pid,
-                        name,
-                        entrypoint,
-                        ident,
-                        local_ip,
-                        // TODO: cpu_quota, cpu_period
-                        memory: (&details).host_config.memory.unwrap(),
-
+        docker
+            .containers()
+            .get(&id)
+            .inspect()
+            .map_err(|_| {
+                logging::error("failed to inspect eru container");
+                ()
+            })
+            .and_then(|details| {
+                if !Self::validate(&details) {
+                    err(())
+                } else {
+                    ok(details)
+                }
+            })
+            .and_then(move |details| {
+                let (name, entrypoint, ident) = parse_container_name(&details);
+                let (local_ip, networks) = parse_container_networks(&details);
+                let container = EruContainer {
+                    meta: ContainerMeta {
+                        id: id,
+                        running: (&details).state.running,
+                        labels: (&details).config.labels.as_ref().unwrap().clone(),
+                        networks,
                         ..Default::default()
-                    };
-                    Self::post_init(container, details).map(|container| Some(container))
-                })
-                .or_else(|_| ok(None))
-                .and_then(|maybe_container| {
-                    tx.send(maybe_container).map_err(|_| {
-                        logging::error("send container failed");
-                        ()
-                    })
-                }),
-        );
-        rx
+                    },
+                    pid: (&details).state.pid,
+                    name,
+                    entrypoint,
+                    ident,
+                    local_ip,
+                    // TODO: cpu_quota, cpu_period
+                    memory: (&details).host_config.memory.unwrap(),
+
+                    ..Default::default()
+                };
+                Self::post_init(container, details).map(|container| Some(container))
+            })
+            .or_else(|_| ok(None))
     }
 
     fn validate(details: &ContainerDetails) -> bool {

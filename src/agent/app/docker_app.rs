@@ -1,5 +1,5 @@
 use futures::future::Future;
-use futures::sync::{mpsc, oneshot};
+use futures::sync::mpsc;
 use futures::Stream;
 use shiplift::builder::{EventFilter, EventFilterType, EventsOptions};
 use shiplift::errors::Error as DockerError;
@@ -48,26 +48,19 @@ impl CosmosApp for ContainerApp {
         Box::new(docker.events(&opts))
     }
 
-    fn get_sandbox(&self, event: &DockerEvent) -> oneshot::Receiver<Option<Self::Sandbox>> {
-        let (tx, rx) = oneshot::channel();
-        tokio::spawn(
-            EruContainer::new(event.id.as_ref().unwrap().clone())
-                .and_then(move |maybe_container| {
-                    tx.send(maybe_container).map_err(|_| {
-                        logging::error("failed to send maybe_conatiner");
-                        oneshot::Canceled {}
-                    })
-                })
-                .map_err(|err| {
-                    logging::error(&format!("failed to create eru container: {:#?}", err))
-                })
-                .map(|_| ()),
-        );
-        rx
+    fn get_sandbox(
+        &self,
+        event: &DockerEvent,
+    ) -> Box<dyn Future<Item = Option<Self::Sandbox>, Error = ()> + Send> {
+        Box::new(
+            EruContainer::new(event.id.as_ref().unwrap().clone()).map_err(|err| {
+                logging::error(&format!("failed to create eru container: {:#?}", err))
+            }),
+        )
     }
 
-    fn list_sandboxes(&self) -> mpsc::Receiver<Self::Sandbox> {
+    fn list_sandboxes(&self) -> Box<dyn Stream<Item = Self::Sandbox, Error = ()> + Send> {
         let (_, rx) = mpsc::channel(1_024);
-        rx
+        Box::new(rx)
     }
 }

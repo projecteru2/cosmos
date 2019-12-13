@@ -2,7 +2,7 @@ pub mod app;
 mod cleg;
 mod server;
 
-use futures::sync::{mpsc, oneshot};
+use futures::Future;
 use futures::Stream;
 
 use crate::model::Sandbox;
@@ -41,7 +41,10 @@ pub trait CosmosApp: Sync {
 
     fn watch(&self) -> Box<dyn Stream<Item = Self::Event, Error = Self::Error> + Send>;
 
-    fn get_sandbox(&self, event: &Self::Event) -> oneshot::Receiver<Option<Self::Sandbox>>;
+    fn get_sandbox(
+        &self,
+        event: &Self::Event,
+    ) -> Box<dyn Future<Item = Option<Self::Sandbox>, Error = ()> + Send>;
 
-    fn list_sandboxes(&self) -> mpsc::Receiver<Self::Sandbox>;
+    fn list_sandboxes(&self) -> Box<dyn Stream<Item = Self::Sandbox, Error = ()> + Send>;
 }

@@ -45,7 +45,7 @@ impl<T: CosmosApp + 'static> HTTPServer<T> {
         hyper::rt::spawn(server);
     }
 
-    pub fn stop(&mut self) {
+    pub fn _stop(&mut self) {
         logging::info("server stopping");
         self.finish
             .take()
