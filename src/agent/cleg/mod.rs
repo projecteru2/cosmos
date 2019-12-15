@@ -30,6 +30,7 @@ impl<T: CosmosApp> Cleg<T> {
         let watcher = self
             .app
             .watch()
+            .map_err(|err| logging::error(&format!("failed to watch docker events: {:#?}", err)))
             .for_each(move |event| {
                 tokio::spawn(
                     app.clone()
@@ -38,11 +39,10 @@ impl<T: CosmosApp> Cleg<T> {
                             Some(sandbox) => sandbox.handle_event(event),
                             None => (),
                         })
-                        .map_err(|_| ()),
+                        .map_err(|e| logging::error(&format!("failed to handle event: {:#?}", e))),
                 );
                 Ok(())
-            })
-            .map_err(|err| logging::error(&format!("failed to watch docker events: {:#?}", err)));
+            });
 
         logging::info("docker event watcher starts");
         tokio::spawn(watcher);
@@ -54,6 +54,7 @@ impl<T: CosmosApp> Cleg<T> {
         let checker = tokio::timer::Interval::new_interval(Duration::from_secs(
             config.health_check_interval as u64,
         ))
+        .map_err(|e| logging::error(&format!("failed to produce timer, {:#?}", e)))
         .for_each(move |_| {
             tokio::spawn(
                 app.clone()
@@ -62,11 +63,10 @@ impl<T: CosmosApp> Cleg<T> {
                         sandbox.report();
                         ok(())
                     })
-                    .map_err(|_| ()),
+                    .map_err(|e| logging::error(&format!("failed to list sandboxes: {:#?}", e))),
             );
             ok(())
-        })
-        .map_err(|_| ());
+        });
         tokio::spawn(checker);
     }
 }

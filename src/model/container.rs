@@ -1,18 +1,23 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
+use chrono::prelude::Utc;
 use futures::future::join_all;
 use futures::future::{err, ok};
+use futures::stream::Stream;
 use futures::Future;
 use hyper::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use shiplift::rep::ContainerDetails;
+use shiplift::tty::StreamType;
 use shiplift::Docker;
+use shiplift::LogsOptions;
 use tokio::net::tcp::TcpStream;
 
 use super::DockerEvent;
 use super::Node;
 use super::Sandbox;
+use crate::agent::{Log, LogExchange};
 use crate::config::get_config;
 use crate::logging;
 use crate::orchestrator::get_orchestrator;
@@ -97,17 +102,45 @@ impl Sandbox for EruContainer {
 impl EruContainer {
     fn started(&self) {
         self.report();
-
-        let collector = self.collect_logs();
-        tokio::spawn(collector);
+        self.collect_logs();
     }
 
     fn died(&self) {
         self.report();
     }
 
-    fn collect_logs(&self) -> impl Future<Item = (), Error = ()> {
-        ok::<(), ()>(())
+    fn collect_logs(&self) {
+        let docker = Docker::new();
+        let id = self.meta.id.clone();
+        let name = self.name.clone();
+        let entrypoint = self.entrypoint.clone();
+        let ident = self.ident.clone();
+        let log_exchange = LogExchange::get();
+        tokio::spawn(
+            docker
+                .containers()
+                .get(&id)
+                .logs(&LogsOptions::builder().stdout(true).stderr(true).build())
+                .map_err(|e| logging::error(&format!("failed to fetch container log: {}", e)))
+                .for_each(move |chunk| {
+                    let log = Log {
+                        id: id.clone(),
+                        name: name.clone(),
+                        r#type: match chunk.stream_type {
+                            StreamType::StdOut => "stdout",
+                            StreamType::StdErr => "stderr",
+                            StreamType::StdIn => "",
+                        }
+                        .to_string(),
+                        entrypoint: entrypoint.clone(),
+                        ident: ident.clone(),
+                        data: chunk.as_string_lossy(),
+                        datetime: Utc::now().to_rfc3339(),
+                        ..Default::default()
+                    };
+                    log_exchange.send(log)
+                }),
+        );
     }
 }
 

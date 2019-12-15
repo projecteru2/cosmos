@@ -1,5 +1,6 @@
 pub mod app;
 mod cleg;
+mod exchange;
 mod server;
 
 use futures::Future;
@@ -7,6 +8,7 @@ use futures::Stream;
 
 use crate::model::{Sandbox, SandboxEvent};
 use cleg::Cleg;
+pub use exchange::{Log, LogExchange};
 use server::HTTPServer;
 
 pub struct Agent<T: CosmosApp + 'static> {
